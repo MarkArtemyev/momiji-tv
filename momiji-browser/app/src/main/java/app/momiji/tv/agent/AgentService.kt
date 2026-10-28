@@ -25,6 +25,7 @@ import java.util.Locale
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
+import kotlin.math.roundToInt
 
 class AgentService : AccessibilityService() {
 
@@ -52,9 +53,10 @@ class AgentService : AccessibilityService() {
 
     override fun onDestroy() {
         instance = null
-        agent.cancelled = true
+        // The system may destroy the service before onServiceConnected ever ran.
+        if (::agent.isInitialized) agent.cancel()
         tts?.shutdown()
-        overlay.remove()
+        if (::overlay.isInitialized) overlay.remove()
         super.onDestroy()
     }
 
@@ -79,7 +81,7 @@ class AgentService : AccessibilityService() {
     }
 
     fun listen() {
-        agent.cancelled = true
+        agent.cancel()
         tts?.stop()
         if (prefs.key.isBlank()) {
             overlay.show("Сначала задай ключ Gemini: Momiji › Пульт ИИ", 6000)
@@ -104,9 +106,9 @@ class AgentService : AccessibilityService() {
             overlay.show("Сначала задай ключ Gemini: Momiji › Пульт ИИ", 6000)
             return
         }
-        agent.cancelled = true
+        val ticket = agent.next()
         overlay.show("» $text")
-        worker.execute { agent.run(text) }
+        worker.execute { agent.run(text, ticket) }
     }
 
     fun status(text: String) {
@@ -150,7 +152,9 @@ class AgentService : AccessibilityService() {
         takeScreenshot(Display.DEFAULT_DISPLAY, shots, object : TakeScreenshotCallback {
             override fun onSuccess(result: ScreenshotResult) {
                 val buffer = result.hardwareBuffer
-                bitmap = Bitmap.wrapHardwareBuffer(buffer, result.colorSpace)?.copy(Bitmap.Config.ARGB_8888, false)
+                val hardware = Bitmap.wrapHardwareBuffer(buffer, result.colorSpace)
+                bitmap = hardware?.copy(Bitmap.Config.ARGB_8888, false)
+                hardware?.recycle()
                 buffer.close()
                 latch.countDown()
             }
@@ -162,9 +166,15 @@ class AgentService : AccessibilityService() {
         latch.await(5, TimeUnit.SECONDS)
         runOnMain { overlay.setHidden(false) }
         val full = bitmap ?: return null
-        val small = Bitmap.createScaledBitmap(full, 960, 540, true)
+        // Keep the screen's proportions and free each frame at once: a run takes up to 12
+        // screenshots, and on low-RAM TVs they must not wait for the GC.
+        val scale = minOf(1f, SHOT_SIZE / maxOf(full.width, full.height))
+        val small = Bitmap.createScaledBitmap(full, (full.width * scale).roundToInt().coerceAtLeast(1),
+            (full.height * scale).roundToInt().coerceAtLeast(1), true)
+        if (small !== full) full.recycle()
         val out = ByteArrayOutputStream()
         small.compress(Bitmap.CompressFormat.JPEG, 80, out)
+        small.recycle()
         return Base64.encodeToString(out.toByteArray(), Base64.NO_WRAP)
     }
 
@@ -305,6 +315,7 @@ class AgentService : AccessibilityService() {
         var instance: AgentService? = null
 
         const val YOUTUBE = "com.google.android.youtube.tv"
+        private const val SHOT_SIZE = 960f
 
         val MEDIA = mapOf(
             "play_pause" to KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE,
