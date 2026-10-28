@@ -1,0 +1,16 @@
+{
+  "sources": {
+    "dns": {
+      "url": "https://adguardteam.github.io/AdGuardSDNSFilter/Filters/filter.txt",
+      "sha256": "943c4954aab8b27fca0b01e4be298f727620d7bc7f985b75f883ad37309830e9",
+      "bytes": 4513862,
+      "build_cache": true
+    },
+    "LICENSE-GPL3": {
+      "url": "https://raw.githubusercontent.com/AdguardTeam/AdguardFilters/master/LICENSE",
+      "sha256": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986",
+      "bytes": 35149,
+      "http_date": "Tue, 27 Oct 2026 17:33:48 GMT"
+    }
+  }
+}

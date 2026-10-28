@@ -1,0 +1,46 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  android:
+    name: Android builds and core checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+          cache-dependency-path: |
+            **/*.gradle.kts
+            **/gradle-wrapper.properties
+      - name: Core integration checks
+        run: ./momiji-browser/gradlew -p tests/network-core networkCheck --no-daemon --max-workers=1
+      - name: Browser build and lint
+        run: ./momiji-browser/gradlew -p momiji-browser :app:assembleDebug :app:assembleRelease :app:lintDebug --no-daemon --max-workers=1
+      - name: Home build and lint
+        run: ./momiji-home/gradlew -p momiji-home :app:assembleDebug :app:assembleRelease :app:lintDebug --no-daemon --max-workers=1
+      - name: APKs and lint reports
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: momiji-tv-build
+          if-no-files-found: error
+          path: |
+            momiji-browser/app/build/outputs/apk/release/*.apk
+            momiji-home/app/build/outputs/apk/release/*.apk
+            momiji-browser/app/build/reports/lint-results-debug.*
+            momiji-home/app/build/reports/lint-results-debug.*

@@ -1,0 +1,221 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/dusk"
+    android:clipChildren="false">
+
+    <WebView
+        android:id="@+id/web"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:focusable="true"
+        android:focusableInTouchMode="true" />
+
+    <FrameLayout
+        android:id="@+id/fullscreen"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#FF000000"
+        android:visibility="gone" />
+
+    <app.momiji.tv.CursorView
+        android:id="@+id/cursor"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
+    <ProgressBar
+        android:id="@+id/progress"
+        style="@android:style/Widget.Material.ProgressBar.Horizontal"
+        android:layout_width="match_parent"
+        android:layout_height="3dp"
+        android:layout_gravity="top"
+        android:indeterminate="false"
+        android:max="100"
+        android:progressDrawable="@drawable/progress"
+        android:visibility="gone" />
+
+    <LinearLayout
+        android:id="@+id/toolbar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top"
+        android:layout_marginStart="40dp"
+        android:layout_marginTop="18dp"
+        android:layout_marginEnd="40dp"
+        android:background="@drawable/panel"
+        android:clipChildren="false"
+        android:clipToPadding="false"
+        android:elevation="8dp"
+        android:orientation="vertical"
+        android:paddingStart="16dp"
+        android:paddingTop="14dp"
+        android:paddingEnd="16dp"
+        android:paddingBottom="10dp"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:clipChildren="false"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <ImageView
+                android:layout_width="30dp"
+                android:layout_height="30dp"
+                android:layout_marginEnd="12dp"
+                android:importantForAccessibility="no"
+                android:src="@drawable/ic_leaf" />
+
+            <EditText
+                android:id="@+id/address"
+                android:layout_width="0dp"
+                android:layout_height="46dp"
+                android:layout_weight="1"
+                android:background="@drawable/field"
+                android:hint="@string/address_hint"
+                android:imeOptions="actionGo|flagNoExtractUi"
+                android:importantForAutofill="no"
+                android:inputType="textUri"
+                android:paddingStart="18dp"
+                android:paddingEnd="18dp"
+                android:singleLine="true"
+                android:textColor="@color/cream"
+                android:textColorHint="@color/hint"
+                android:textSize="17sp" />
+
+            <ImageButton
+                android:id="@+id/btn_voice"
+                android:layout_width="46dp"
+                android:layout_height="46dp"
+                android:layout_marginStart="10dp"
+                android:background="@drawable/round_bg"
+                android:contentDescription="@string/voice"
+                android:src="@drawable/ic_mic"
+                android:tint="@color/chip_fg" />
+        </LinearLayout>
+
+        <HorizontalScrollView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:clipChildren="false"
+            android:clipToPadding="false"
+            android:paddingTop="6dp"
+            android:paddingBottom="6dp"
+            android:scrollbars="none">
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:clipChildren="false"
+                android:orientation="horizontal"
+                android:paddingStart="2dp"
+                android:paddingEnd="8dp">
+
+                <TextView
+                    android:id="@+id/chip_back"
+                    style="@style/Chip"
+                    android:drawableStart="@drawable/ic_back"
+                    android:text="@string/back" />
+
+                <TextView
+                    android:id="@+id/chip_forward"
+                    style="@style/Chip"
+                    android:drawableStart="@drawable/ic_forward"
+                    android:text="@string/forward" />
+
+                <TextView
+                    android:id="@+id/chip_reload"
+                    style="@style/Chip"
+                    android:drawableStart="@drawable/ic_reload"
+                    android:text="@string/reload" />
+
+                <TextView
+                    android:id="@+id/chip_home"
+                    style="@style/Chip"
+                    android:drawableStart="@drawable/ic_home"
+                    android:text="@string/home" />
+
+                <TextView
+                    android:id="@+id/chip_player"
+                    style="@style/Chip"
+                    android:text="@string/native_player" />
+
+                <TextView
+                    android:id="@+id/chip_focus"
+                    style="@style/Chip"
+                    android:text="@string/focus_off" />
+
+                <TextView
+                    android:id="@+id/chip_remote"
+                    style="@style/Chip"
+                    android:text="@string/remote_title" />
+
+                <TextView
+                    android:id="@+id/chip_lite"
+                    style="@style/Chip"
+                    android:text="@string/lite_off" />
+
+                <TextView
+                    android:id="@+id/chip_effects"
+                    style="@style/Chip"
+                    android:text="@string/effects_on" />
+
+                <TextView
+                    android:id="@+id/chip_star"
+                    style="@style/Chip"
+                    android:drawableStart="@drawable/ic_star"
+                    android:text="@string/star" />
+
+                <TextView
+                    android:id="@+id/chip_zoom_out"
+                    style="@style/Chip"
+                    android:text="@string/zoom_out" />
+
+                <TextView
+                    android:id="@+id/chip_zoom_in"
+                    style="@style/Chip"
+                    android:text="@string/zoom_in" />
+
+                <TextView
+                    android:id="@+id/chip_ads"
+                    style="@style/Chip"
+                    android:drawableStart="@drawable/ic_shield"
+                    android:text="@string/ads_on" />
+
+                <TextView android:id="@+id/chip_protection" style="@style/Chip" android:text="Сеть и защита" />
+
+                <TextView
+                    android:id="@+id/chip_desktop"
+                    style="@style/Chip"
+                    android:drawableStart="@drawable/ic_desktop"
+                    android:text="@string/desktop_off" />
+
+                <TextView
+                    android:id="@+id/chip_engine"
+                    style="@style/Chip"
+                    android:drawableStart="@drawable/ic_search"
+                    android:text="@string/engine" />
+            </LinearLayout>
+        </HorizontalScrollView>
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/hint"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|center_horizontal"
+        android:layout_marginBottom="28dp"
+        android:alpha="0"
+        android:background="@drawable/pill"
+        android:elevation="6dp"
+        android:paddingStart="22dp"
+        android:paddingTop="10dp"
+        android:paddingEnd="22dp"
+        android:paddingBottom="10dp"
+        android:textColor="@color/cream"
+        android:textSize="15sp"
+        android:visibility="gone" />
+</FrameLayout>

@@ -1,0 +1,22 @@
+# Local tooling and Android build output
+**/.gradle/
+**/.kotlin/
+**/build/
+**/local.properties
+**/.idea/
+*.iml
+.DS_Store
+Thumbs.db
+# Signing material and runtime data
+*.jks
+*.keystore
+*.p12
+*.key
+*.pem
+.env
+.env.*
+*.apk
+*.aab
+*.log
+*.hprof
+__pycache__/

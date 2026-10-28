@@ -1,0 +1,22 @@
+<resources>
+    <style name="HomeTheme" parent="android:style/Theme.Material.NoActionBar">
+        <item name="android:fontFamily">sans</item>
+        <item name="android:windowActionModeOverlay">true</item>
+        <item name="android:windowFullscreen">true</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowBackground">#11151C</item>
+        <item name="android:colorAccent">#F4B878</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowActionBar">false</item>
+        <item name="android:alertDialogTheme">@style/MomijiDialog</item>
+    </style>
+    <style name="MomijiDialog" parent="android:style/Theme.Material.Dialog.Alert">
+        <item name="android:windowBackground">@drawable/dialog_surface</item>
+        <item name="android:colorAccent">#F4B878</item>
+        <item name="android:textColorPrimary">#F6F1E7</item>
+        <item name="android:textColorSecondary">#BDC1C7</item>
+        <item name="android:windowElevation">12dp</item>
+        <item name="android:backgroundDimAmount">0.48</item>
+        <item name="android:fontFamily">sans</item>
+    </style>
+</resources>

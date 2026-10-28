@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="video_menu">Видео · меню</string>
+    <string name="video_options">Настройки видео</string>
+    <string name="video_quality">Качество</string>
+    <string name="video_quality_auto">Автоматически</string>
+    <string name="video_quality_loading">Дорожки ещё загружаются. Попробуй после начала видео.</string>
+    <string name="video_restart">Смотреть сначала</string>
+    <string name="video_stats">Статистика воспроизведения</string>
+    <string name="video_stats_values">Первый кадр: %1$s\nВидео: %2$s\nБуфер вперёд: %3$s\nОстановок для загрузки: %4$d\nВремя этих остановок: %5$s\nПропущено кадров: %6$d\nОценка скорости загрузки: %7$s\n\nСтатистика текущего открытия плеера. Это не тест скорости интернет-тарифа.</string>
+    <string name="video_seconds">%1$.1f с</string>
+    <string name="video_mbps">%1$.1f Мбит/с</string>
+    <string name="video_unknown">—</string>
+    <string name="video_track">Дорожка %1$d</string>
+</resources>

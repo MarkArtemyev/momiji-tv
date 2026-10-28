@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="dusk">#FF1B1020</color>
+    <color name="ink">#FF2A140C</color>
+    <color name="cream">#FFFFF3E0</color>
+    <color name="amber">#FFFFB347</color>
+    <color name="persimmon">#FFFF7A3D</color>
+    <color name="maple">#FFE2513A</color>
+    <color name="plum">#FF6B3A5E</color>
+    <color name="hint">#99F6D7A7</color>
+</resources>

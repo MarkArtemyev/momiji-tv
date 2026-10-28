@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Momiji · пульт с ПК</title><link rel="stylesheet" href="/style.css"></head>
+<body><main>
+<header><div class="mark">も</div><div><p class="eyebrow">MOMIJI / CONNECT</p><h1>Большой экран.<br>Твоё управление.</h1></div><span id="status">Не подключён</span></header>
+<section id="pairing"><p>Открой «Пульт с ПК» на телевизоре и введи код с экрана. ПК и телевизор должны быть в одной сети.</p>
+<form id="pair"><label for="code">Код на телевизоре</label><div class="pair-row"><input id="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="off" placeholder="000000" required><button>Подключиться</button></div></form><p id="error" role="alert"></p></section>
+<section id="controls" hidden>
+<nav><button data-command="back">← Назад</button><button data-command="home">⌂ Главная</button><button data-command="menu">Адрес и меню</button><button data-command="play_pause">▶ / Ⅱ</button><button data-command="seek_back">−10 с</button><button data-command="seek_forward">+10 с</button></nav>
+<div id="pad" tabindex="0" role="application" aria-label="Мышь и клавиатура телевизора">
+<div class="crosshair">＋</div><p>Мышь — курсор на ТВ<br><span>Колесо — прокрутка · правый клик — меню</span></p><small>Нажми здесь для ввода с клавиатуры</small></div>
+<form id="text-form"><label for="text">Текст или ссылка</label><div class="text-row"><textarea id="text" rows="2" placeholder="Пиши здесь — кириллица и вставка тоже работают"></textarea><button id="send-text">Ввести</button><button id="open-url" type="button">Открыть / найти</button></div></form>
+<p class="hint">Чтобы ввести текст в сайт, сначала выбери поле на телевизоре. «Открыть / найти» сразу откроет ссылку или выполнит поиск.</p>
+<button id="disconnect" class="quiet">Отключить этот пульт</button>
+</section><footer>Локальное соединение · без USB · без установки на ПК</footer>
+</main><script src="/app.js"></script></body></html>

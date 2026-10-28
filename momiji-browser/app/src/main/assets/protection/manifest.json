@@ -1,0 +1,41 @@
+{
+  "session_date": "2026-10-27",
+  "sources": {
+    "dns": {
+      "url": "https://adguardteam.github.io/AdGuardSDNSFilter/Filters/filter.txt",
+      "sha256": "943c4954aab8b27fca0b01e4be298f727620d7bc7f985b75f883ad37309830e9",
+      "bytes": 4513862,
+      "build_cache": true
+    },
+    "base": {
+      "url": "https://raw.githubusercontent.com/AdguardTeam/FiltersRegistry/master/filters/filter_2_Base/filter.txt",
+      "sha256": "897d8953f996cc79e3333b798d8bf00d3e70d8753820faf07542b0c92a9e7b19",
+      "bytes": 7911762,
+      "http_date": "Tue, 27 Oct 2026 17:31:36 GMT"
+    },
+    "russian": {
+      "url": "https://raw.githubusercontent.com/AdguardTeam/FiltersRegistry/master/filters/filter_1_Russian/filter.txt",
+      "sha256": "f7e4587e46276e221414a9724d85df3303339bfe7fe039f3ee30b579b3c8082d",
+      "bytes": 1078868,
+      "http_date": "Tue, 27 Oct 2026 17:32:24 GMT"
+    },
+    "privacy": {
+      "url": "https://raw.githubusercontent.com/AdguardTeam/FiltersRegistry/master/filters/filter_3_Spyware/filter.txt",
+      "sha256": "a4c3a41ffcfa080037232df6a4023215107df8d1f0608ec2b684d8cc6b1c4ec2",
+      "bytes": 13152234,
+      "http_date": "Tue, 27 Oct 2026 17:32:26 GMT"
+    },
+    "publicsuffix": {
+      "url": "https://publicsuffix.org/list/public_suffix_list.dat",
+      "sha256": "0232f4df0831911356e8ee1f4d5c3b6b12c0ed3f6bd66b0f81c8ab5d3d49e9ca",
+      "bytes": 338012,
+      "http_date": "Tue, 27 Oct 2026 15:40:35 GMT"
+    },
+    "LICENSE-GPL3": {
+      "url": "https://raw.githubusercontent.com/AdguardTeam/AdguardFilters/master/LICENSE",
+      "sha256": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986",
+      "bytes": 35149,
+      "http_date": "Tue, 27 Oct 2026 17:33:48 GMT"
+    }
+  }
+}
