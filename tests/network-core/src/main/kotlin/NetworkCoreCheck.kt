@@ -18,7 +18,7 @@ fun main(args: Array<String>) {
     val rules=RequestRules(listOf("||ads.example^","@@||ads.example/content/","||ads.example/forced*\$important",
         "@@||ads.example/forced-safe\$important","||cdn.example/promo/*\$script,third-party,domain=site.co.uk|~safe.site.co.uk",
         "||cdn.example/exact.js\$script,match-case","||disabled.example^\$image,third-party",
-        "||disabled.example^\$third-party,image,badfilter","/ad-banners/*\$image", "||unsupported.example^\$redirect=noopjs",
+        "||disabled.example^\$third-party,image,badfilter","/ad-banners/*\$image", "||unsupported.example^\$removeparam=utm",
         "@@||unfiltered.example^\$document","||disabled.example^\$font"),suffix)
     fun block(url: String,document: String="https://www.site.co.uk/",type: ResourceType=ResourceType.SCRIPT)=rules.blocks(FilterRequest(url,document,type))
     test("host_boundary_and_url_exceptions") { check(block("https://sub.ads.example/ad.js")); check(!block("https://ads.example.evil.test/ad.js")); check(!block("https://ads.example/content/play.js")) }
@@ -158,5 +158,6 @@ fun main(args: Array<String>) {
             Thread.sleep(150); check(proxy.connections<=24); proxy.close(); clients.forEach { it.close() }
         }
     } finally { server.close(); handlers.shutdownNow() }
+    adblockChecks(args.getOrNull(1)?.let(::File)) { name, action -> test(name, action) }
     println("NETWORK_CORE_PASSED=${results.size}")
 }

@@ -7,7 +7,7 @@ kotlin {
     compilerOptions { jvmTarget.set(JvmTarget.JVM_17) }
     sourceSets.main {
         kotlin.srcDirs("../../momiji-network-core/src/main/kotlin", "src/main/kotlin")
-        kotlin.include("app/momiji/net/DomainTable.kt", "app/momiji/net/RequestRules.kt", "app/momiji/net/TlsHello.kt", "app/momiji/net/LoopbackProxy.kt", "NetworkCoreCheck.kt")
+        kotlin.include("app/momiji/net/DomainTable.kt", "app/momiji/net/RequestRules.kt", "app/momiji/net/FilterSyntax.kt", "app/momiji/net/CosmeticRules.kt", "app/momiji/net/HlsPruner.kt", "app/momiji/net/Shield.kt", "app/momiji/net/TlsHello.kt", "app/momiji/net/LoopbackProxy.kt", "*.kt")
     }
 }
 
@@ -29,6 +29,16 @@ tasks.register<JavaExec>("networkCheck") {
     dependsOn(tasks.classes, createFixture)
     classpath = sourceSets.main.get().runtimeClasspath
     mainClass.set("NetworkCoreCheckKt")
-    jvmArgs("--add-modules", "jdk.httpserver", "-Xmx256m")
-    args(fixture.get().asFile.absolutePath)
+    jvmArgs("--add-modules", "jdk.httpserver", "-Xmx768m")
+    args(fixture.get().asFile.absolutePath, rootDir.parentFile.parentFile.absolutePath)
+}
+
+tasks.register<JavaExec>("compileProtection") {
+    group = "build"
+    description = "Rebuild the bundled compiled filters from the bundled lists"
+    dependsOn(tasks.classes)
+    classpath = sourceSets.main.get().runtimeClasspath
+    mainClass.set("ProtectionCompilerKt")
+    jvmArgs("-Xmx1g")
+    args(rootDir.parentFile.parentFile.resolve("momiji-browser/app/src/main/assets/protection").absolutePath)
 }
