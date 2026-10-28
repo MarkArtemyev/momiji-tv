@@ -90,7 +90,7 @@ class SetupActivity : Activity() {
             else -> getString(R.string.agent_button_missing)
         }
         val address = localAddress()
-        hint.text = if (address != null) getString(R.string.agent_key_hint, "http://$address:${KeyServer.PORT}") else getString(R.string.agent_key_hint_offline)
+        hint.text = if (address != null) getString(R.string.agent_key_hint, "http://$address:${KeyServer.PORT}", server.code) else getString(R.string.agent_key_hint_offline)
         val spares = prefs.chain.drop(1).joinToString(", ").ifEmpty { "нет" }
         model.text = getString(R.string.agent_model_info, prefs.model, spares, prefs.thinking)
     }

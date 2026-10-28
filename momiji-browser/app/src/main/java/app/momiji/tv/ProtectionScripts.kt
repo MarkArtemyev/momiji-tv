@@ -10,7 +10,7 @@ object ProtectionScripts {
         return """
             (function(){var allow=$hosts;var host=location.hostname.toLowerCase();
             if(allow.some(function(x){return host===x||host.endsWith('.'+x);}))return;
-            function note(url,method,kind){try{if(window.MomijiShield)window.MomijiShield.note(new URL(url,location.href).href,String(method||'GET'),kind,location.href);}catch(e){}}
+            function note(url,method,kind){try{if(window.MomijiShield)window.MomijiShield.note(new URL(url,location.href).href,String(method||'GET'),kind);}catch(e){}}
             if(window.fetch){var fetchOriginal=window.fetch;window.fetch=function(input,options){note(typeof input==='string'||input instanceof URL?input:input.url,(options&&options.method)||(input&&input.method)||'GET','fetch');return fetchOriginal.apply(this,arguments);};}
             var openOriginal=XMLHttpRequest.prototype.open,sendOriginal=XMLHttpRequest.prototype.send,tag=Symbol('momijiRequest');
             XMLHttpRequest.prototype.open=function(method,url){this[tag]=[url,method];return openOriginal.apply(this,arguments);};

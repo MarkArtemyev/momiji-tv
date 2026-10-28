@@ -380,7 +380,8 @@ class MainActivity : Activity(), RemoteControl.Target {
             headers["x-requested-with"]=="xmlhttprequest" || headers["sec-fetch-mode"] in setOf("cors","same-origin")->app.momiji.net.ResourceType.XMLHTTPREQUEST
             else->app.momiji.net.ResourceType.OTHER
         }
-        val initiator=hint?.page ?: request.requestHeaders.entries.firstOrNull { it.key.equals("Referer",true) }?.value ?: documentUrl
+        // Pages can call MomijiShield themselves, so the initiator never comes from a hint.
+        val initiator=request.requestHeaders.entries.firstOrNull { it.key.equals("Referer",true) }?.value ?: documentUrl
         return app.momiji.net.FilterRequest(request.url.toString(),initiator,type)
     }
 
@@ -1038,12 +1039,15 @@ class MainActivity : Activity(), RemoteControl.Target {
                     if (onHome) command(uri)
                     true
                 }
+                // Like Chrome, a page may hand off to another app only from a user gesture,
+                // so ads and scripted redirects cannot launch the Play Store or other apps.
                 "intent" -> {
-                    openIntent(uri.toString())
+                    if (request.hasGesture()) openIntent(uri.toString()) else say(getString(R.string.app_blocked))
                     true
                 }
                 else -> {
-                    if (!openExternal(Intent(Intent.ACTION_VIEW, uri))) say(getString(R.string.no_app))
+                    if (!request.hasGesture()) say(getString(R.string.app_blocked))
+                    else if (!openExternal(Intent(Intent.ACTION_VIEW, uri))) say(getString(R.string.no_app))
                     true
                 }
             }

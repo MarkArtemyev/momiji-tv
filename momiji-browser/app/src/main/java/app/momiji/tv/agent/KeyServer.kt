@@ -1,20 +1,34 @@
 package app.momiji.tv.agent
 
+import android.os.SystemClock
 import java.io.ByteArrayOutputStream
 import java.io.IOException
 import java.io.InputStream
 import java.net.ServerSocket
 import java.net.Socket
 import java.net.URLDecoder
+import java.security.MessageDigest
+import java.security.SecureRandom
 import kotlin.concurrent.thread
 
 class KeyServer(private val prefs: AgentPrefs, private val onSaved: () -> Unit) {
 
     @Volatile
     private var server: ServerSocket? = null
+    private val random = SecureRandom()
+    private val lock = Any()
+    private var tries = 0
+    private var triesAt = 0L
+
+    /** Shown only on the TV. Anyone else on the LAN can open the form, but nothing is saved without it. */
+    @Volatile
+    var code = ""
+        private set
 
     fun start() {
         if (server != null) return
+        code = (100_000 + random.nextInt(900_000)).toString()
+        synchronized(lock) { tries = 0 }
         thread(isDaemon = true, name = "keyserver") {
             try {
                 val socket = ServerSocket(PORT)
@@ -36,6 +50,7 @@ class KeyServer(private val prefs: AgentPrefs, private val onSaved: () -> Unit) 
         } catch (e: IOException) {
         }
         server = null
+        code = ""
     }
 
     private fun handle(client: Socket) {
@@ -52,9 +67,13 @@ class KeyServer(private val prefs: AgentPrefs, private val onSaved: () -> Unit) 
             val page = when {
                 method == "GET" && (path == "/" || path.startsWith("/?")) -> form()
                 method == "POST" && path == "/save" -> {
-                    save(parse(body))
-                    onSaved()
-                    done()
+                    val fields = parse(body)
+                    val error = verify(fields["code"].orEmpty())
+                    if (error != null) form(error) else {
+                        save(fields)
+                        onSaved()
+                        done()
+                    }
                 }
                 else -> null
             }
@@ -99,6 +118,21 @@ class KeyServer(private val prefs: AgentPrefs, private val onSaved: () -> Unit) 
             URLDecoder.decode(k, "UTF-8") to URLDecoder.decode(v, "UTF-8")
         }
 
+    /** Five tries per 30 seconds, like the PC remote. Returns the error to show, or null for a valid code. */
+    private fun verify(supplied: String): String? = synchronized(lock) {
+        val now = SystemClock.elapsedRealtime()
+        if (now - triesAt > 30_000) {
+            tries = 0
+            triesAt = now
+        }
+        when {
+            ++tries > 5 -> "Слишком много попыток. Подожди 30 секунд."
+            code.isEmpty() || !MessageDigest.isEqual(code.toByteArray(), supplied.trim().toByteArray()) ->
+                "Неверный код. Посмотри его на экране телевизора."
+            else -> null
+        }
+    }
+
     private fun save(fields: Map<String, String>) {
         fields["key"]?.trim()?.takeIf { it.isNotEmpty() }?.let { prefs.key = it }
         fields["model"]?.let { prefs.model = it }
@@ -108,15 +142,17 @@ class KeyServer(private val prefs: AgentPrefs, private val onSaved: () -> Unit) 
 
     private fun escape(s: String) = s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;")
 
-    private fun form(): String {
+    private fun form(error: String? = null): String {
         val hint = if (prefs.key.isBlank()) "вставь ключ" else "ключ задан, оставь пустым, чтобы не менять"
         val options = LEVELS.joinToString("") { level ->
             val selected = if (level == prefs.thinking) " selected" else ""
             "<option$selected>$level</option>"
         }
+        val alert = error?.let { "<p class=\"err\">${escape(it)}</p>" }.orEmpty()
         return """<!doctype html><html lang="ru"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Momiji · пульт ИИ</title><style>$STYLE</style>
-<form method="post" action="/save"><h1>🍁 Пульт ИИ</h1><p>Ключ хранится только на телевизоре.</p>
+<form method="post" action="/save"><h1>🍁 Пульт ИИ</h1><p>Ключ хранится только на телевизоре.</p>$alert
+<label>Код с экрана телевизора</label><input name="code" inputmode="numeric" autocomplete="off" maxlength="6" required>
 <label>Ключ Gemini API</label><input name="key" type="password" autocomplete="off" placeholder="${escape(hint)}">
 <label>Модель</label><input name="model" value="${escape(prefs.model)}">
 <label>Запасные модели через запятую, по очереди (пусто, чтобы отключить)</label><input name="fallback" value="${escape(prefs.fallback)}">
@@ -132,7 +168,7 @@ class KeyServer(private val prefs: AgentPrefs, private val onSaved: () -> Unit) 
         private val LEVELS = listOf("minimal", "low", "medium", "high")
         private const val STYLE = "body{margin:0;min-height:100vh;display:grid;place-items:center;background:#1b1020;color:#fff3e0;" +
             "font:16px system-ui,sans-serif}form{width:min(440px,92vw);padding:28px;border-radius:20px;background:#2a1828;" +
-            "border:1px solid #ffb34766}h1{margin:0 0 6px;font-size:24px}p{margin:0 0 18px;opacity:.75}" +
+            "border:1px solid #ffb34766}h1{margin:0 0 6px;font-size:24px}p{margin:0 0 18px;opacity:.75}p.err{color:#ff9b85;opacity:1}" +
             "label{display:block;margin:14px 0 6px;font-size:14px;opacity:.85}input,select{width:100%;box-sizing:border-box;" +
             "padding:12px 14px;border-radius:12px;border:1px solid #ffb34755;background:#1b1020;color:inherit;font:inherit}" +
             "button{margin-top:20px;width:100%;padding:13px;border:0;border-radius:12px;" +

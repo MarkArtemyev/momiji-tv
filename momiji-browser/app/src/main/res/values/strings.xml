@@ -27,6 +27,7 @@
     <string name="no_downloads">Скачивать файлы я пока не умею</string>
     <string name="no_voice">Голосовой ввод недоступен</string>
     <string name="no_app">Нечем открыть эту ссылку</string>
+    <string name="app_blocked">Сайт сам пытался открыть приложение: не пустил. Нажми на ссылку, если это нужно</string>
     <string name="focus_on">Управление: элементы</string>
     <string name="focus_off">Управление: курсор</string>
     <string name="focus_hint">Стрелки выбирают элементы сайта · ОК открывает · зажми ОК для меню</string>
@@ -62,7 +63,7 @@
     <string name="agent_btn_button">Выбрать кнопку</string>
     <string name="agent_btn_voice">Сказать команду</string>
     <string name="agent_btn_test">Проверить</string>
-    <string name="agent_key_hint">Ключ и модель задаются с телефона или компьютера: открой %1$s и вставь ключ. Страница работает, пока открыт этот экран.</string>
+    <string name="agent_key_hint">Ключ и модель задаются с телефона или компьютера: открой %1$s, введи код %2$s и вставь ключ. Страница работает, пока открыт этот экран.</string>
     <string name="agent_key_hint_offline">Телевизор не в сети, ключ сейчас не задать.</string>
     <string name="agent_model_info">Модель %1$s · запасные: %2$s · думает: %3$s</string>
 </resources>
