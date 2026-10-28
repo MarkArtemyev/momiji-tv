@@ -27,6 +27,11 @@
     <string name="no_downloads">Скачивать файлы я пока не умею</string>
     <string name="no_voice">Голосовой ввод недоступен</string>
     <string name="no_app">Нечем открыть эту ссылку</string>
+    <string name="popup_blocked">Заблокировал всплывающую рекламу</string>
+    <string name="popup_title">Новое окно</string>
+    <string name="popup_ask">Сайт пытается открыть %1$s в новом окне. Это часто реклама. Открыть вместо текущей страницы?</string>
+    <string name="popup_open">Открыть</string>
+    <string name="popup_stay">Остаться здесь</string>
     <string name="app_blocked">Сайт сам пытался открыть приложение: не пустил. Нажми на ссылку, если это нужно</string>
     <string name="focus_on">Управление: элементы</string>
     <string name="focus_off">Управление: курсор</string>

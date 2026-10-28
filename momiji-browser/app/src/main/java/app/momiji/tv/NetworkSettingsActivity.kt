@@ -14,6 +14,7 @@ import android.widget.*
 import app.momiji.net.*
 import java.net.URL
 import java.util.concurrent.Executors
+import app.momiji.net.CosmeticRules
 
 class NetworkSettingsActivity: Activity() {
     private lateinit var prefs: ProtectionPreferences
@@ -82,7 +83,7 @@ class NetworkSettingsActivity: Activity() {
         filterStatus=TextView(this).apply { textSize=13f; setTextColor(0xffb7bfcb.toInt()); setPadding(0,dp(14),0,dp(10)) }
         body.addView(filterStatus); refreshStatus()
         button("Как работает защита и где её пределы") { AlertDialog.Builder(this).setTitle("Защита внутри Momiji")
-            .setMessage("Фильтры браузера учитывают адрес, тип запроса, сайт и исключения. Главный экран блокирует рекламные и отслеживающие домены при загрузке картинок. Чужие приложения и системный трафик эти настройки не фильтруют.\n\nTCP-разбиение меняет начальную отправку HTTPS без расшифровки и подмены сертификатов. VPN-слот Android не используется; IP не скрывается. Обход зависит от провайдера: блокировки по IP, UDP/QUIC и ограничения VPN-протоколов универсально не снимаются.\n\nSOCKS5 подключается к запущенному тобой ByeDPI или другому доверенному прокси. DoH отправляет DNS выбранному провайдеру по HTTPS. Если сайт сломался, добавь его в исключения или отключи обход. Встроенные в видеопоток вставки и реклама сторонних приложений могут остаться.")
+            .setMessage("Фильтры браузера учитывают адрес, тип запроса, сайт и исключения. Главный экран блокирует рекламные и отслеживающие домены при загрузке картинок. Чужие приложения и системный трафик эти настройки не фильтруют.\n\nTCP-разбиение меняет начальную отправку HTTPS без расшифровки и подмены сертификатов. VPN-слот Android не используется; IP не скрывается. Обход зависит от провайдера: блокировки по IP, UDP/QUIC и ограничения VPN-протоколов универсально не снимаются.\n\nSOCKS5 подключается к запущенному тобой ByeDPI или другому доверенному прокси. DoH отправляет DNS выбранному провайдеру по HTTPS. Если сайт сломался, добавь его в исключения или отключи обход. \n\nРеклама в видео: подставляются пустые VAST и заглушки рекламных SDK, чтобы плеер сразу переходил к фильму; из HLS-записей вырезаются вставленные сервером ролики (метки SCTE-35, правила \$hls, рекламные адреса). В прямых эфирах и при бесшовной вставке без меток ролики могут остаться. Реклама сторонних приложений, в том числе приложения YouTube, не фильтруется.")
             .setPositiveButton("Понятно",null).show() }
         button("Готово") { finish() }
     }
@@ -99,7 +100,11 @@ class NetworkSettingsActivity: Activity() {
     }
     private fun refreshStatus() {
         filterButton?.text="Обновить фильтры · ${AdBlock.size} доменов"
-        filterStatus?.text="${FilterRepository.status}\nКонтекстных правил: ${FilterRepository.advanced?.count ?: 0}. Режим меняется для новых соединений — перезагрузи страницу или открой плеер заново."
+        val rules=FilterRepository.advanced; val page=Cosmetic.counts
+        filterStatus?.text="${FilterRepository.status}\nСетевых правил: ${rules?.count ?: 0} · подмен для плееров и скриптов: ${rules?.redirectCount ?: 0} · " +
+            "попапов: ${rules?.popupCount ?: 0} · правок ответов: ${rules?.contentCount ?: 0}\n" +
+            "Скриптлетов: ${page[CosmeticRules.Kind.SCRIPTLET] ?: 0} · правил скрытия: ${(page[CosmeticRules.Kind.HIDE] ?: 0)+(page[CosmeticRules.Kind.EXTENDED] ?: 0)} · " +
+            "стилей: ${page[CosmeticRules.Kind.STYLE] ?: 0}. Режим меняется для новых соединений — перезагрузи страницу или открой плеер заново."
     }
     private fun button(label: String,action: ()->Unit): TextView {
         val view=TextView(this).apply {

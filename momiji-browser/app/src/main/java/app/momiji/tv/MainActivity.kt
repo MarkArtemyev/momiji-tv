@@ -9,6 +9,7 @@ import android.content.Intent
 import android.graphics.Bitmap
 import android.net.Uri
 import android.os.Bundle
+import android.os.Message
 import android.os.SystemClock
 import android.speech.RecognizerIntent
 import android.view.InputDevice
@@ -57,6 +58,7 @@ class MainActivity : Activity(), RemoteControl.Target {
     private var externalNavigationPending=false
     @Volatile private var documentUrl=""
     private val requestHints=RequestHints()
+    private val shieldBridge=ShieldBridge(requestHints)
 
     private lateinit var store: Store
     private lateinit var web: WebView
@@ -78,6 +80,8 @@ class MainActivity : Activity(), RemoteControl.Target {
     private val assetsLoader by lazy { WebViewAssetLoader.Builder().addPathHandler("/assets/", WebViewAssetLoader.AssetsPathHandler(this)).build() }
     private val pageScript by lazy { assets.open("browser/page.js").bufferedReader().use { it.readText() } }
     private var startScript: ScriptHandler? = null
+    private val shieldScripts = ArrayList<ScriptHandler>()
+    private var scriptsRevision = -1L
     private var pageEpoch = 0L
     private var cleanedEpoch = -1L
     private var lastFrameAt = 0L
@@ -198,7 +202,7 @@ class MainActivity : Activity(), RemoteControl.Target {
             web.onResume()
             val next="${store.adBlock}|${protection.allowedHosts}|${protection.blockPopups}|${protection.blockThirdPartyCookies}|${protection.config()}|${protection.customRules.hashCode()}|${FilterRepository.revision}"
             if(protectionState.isNotEmpty() && protectionState!=next) {
-                adBlock=store.adBlock; installStartScript(); refreshChips()
+                adBlock=store.adBlock; AdBlock.clearCaches(); installStartScript(); refreshChips()
                 if(!externalNavigationPending) webNetwork.apply { okay -> if(okay && webAlive) load(web.url ?: HOME) else say("Прокси недоступен: проверь настройки сети Momiji") }
             }
             protectionState=next
@@ -229,7 +233,7 @@ class MainActivity : Activity(), RemoteControl.Target {
     override fun onDestroy() {
         resetHeld()
         hint.removeCallbacks(hideHint)
-        if (WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) startScript?.remove()
+        if (WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) { startScript?.remove(); shieldScripts.forEach { it.remove() } }
         filters.shutdownNow()
         ServiceWorkerController.getInstance().setServiceWorkerClient(null)
         if (webAlive) {
@@ -325,7 +329,8 @@ class MainActivity : Activity(), RemoteControl.Target {
         s.setSupportZoom(true)
         s.builtInZoomControls = true
         s.displayZoomControls = false
-        s.setSupportMultipleWindows(false)
+        // New windows go through onCreateWindow, where popunders are filtered instead of replacing the page.
+        s.setSupportMultipleWindows(true)
         s.javaScriptCanOpenWindowsAutomatically = false
         s.mixedContentMode = WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
         // вне touch mode каждый web.requestFocus() переводит фокус на первый элемент страницы и прокручивает её наверх
@@ -334,12 +339,12 @@ class MainActivity : Activity(), RemoteControl.Target {
         applyUa()
 
         CookieManager.getInstance().setAcceptCookie(true)
-        web.addJavascriptInterface(requestHints,"MomijiShield")
+        web.addJavascriptInterface(shieldBridge,"MomijiShield")
         CookieManager.getInstance().setAcceptThirdPartyCookies(web, !(adBlock && protection.blockThirdPartyCookies))
 
         installStartScript()
         ServiceWorkerController.getInstance().setServiceWorkerClient(object : ServiceWorkerClient() {
-            override fun shouldInterceptRequest(request: WebResourceRequest): WebResourceResponse? = blockedResponse(request)
+            override fun shouldInterceptRequest(request: WebResourceRequest): WebResourceResponse? = protect(request)
         })
 
         web.webViewClient = Client()
@@ -348,22 +353,40 @@ class MainActivity : Activity(), RemoteControl.Target {
         web.requestFocus()
     }
 
+    /**
+     * Three document-start scripts: the shield first (scriptlets must run before page code), then the
+     * remote-input page script, then the lists' raw JS rules on their own domains. They are separate
+     * so a script an old WebView cannot parse never takes remote input down with it.
+     */
     private fun installStartScript() {
-        if (WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) startScript?.remove()
-        startScript = null
-        if (WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
-            val cosmetic = if (adBlock) ProtectionScripts.start(protection) else ""
-            startScript = WebViewCompat.addDocumentStartJavaScript(web,
-                "(function(){if(!/^https?:$/.test(location.protocol)||location.hostname==='appassets.androidplatform.net')return;" +
-                    pageScript + ";window.__momijiPage&&window.__momijiPage.configure(${inputConfig()});" + cosmetic + "})();",
-                setOf("*"))
+        if (!WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) return
+        startScript?.remove(); startScript = null
+        shieldScripts.forEach { it.remove() }; shieldScripts.clear()
+        scriptsRevision = FilterRepository.revision
+        shieldBridge.blockPopups = protection.blockPopups
+        if (adBlock) {
+            runCatching { shieldScripts.add(WebViewCompat.addDocumentStartJavaScript(web, ShieldScript.shield(this), setOf("*"))) }
+                .onFailure { android.util.Log.e("MomijiFilters", "Shield script rejected", it) }
+            ShieldScript.raw(Cosmetic.scripts())?.let { raw ->
+                runCatching { shieldScripts.add(WebViewCompat.addDocumentStartJavaScript(web, raw.code, raw.origins)) }
+                    .recoverCatching { shieldScripts.add(WebViewCompat.addDocumentStartJavaScript(web, raw.code, setOf("*"))) }
+            }
         }
+        startScript = WebViewCompat.addDocumentStartJavaScript(web,
+            "(function(){if(!/^https?:$/.test(location.protocol)||location.hostname==='appassets.androidplatform.net')return;" +
+                pageScript + ";window.__momijiPage&&window.__momijiPage.configure(${inputConfig()});})();",
+            setOf("*"))
     }
 
-    private fun blockedResponse(request: WebResourceRequest): WebResourceResponse? {
-        if (!adBlock || request.isForMainFrame || !AdBlock.blocks(filterRequest(request))) return null
+    /** Blocked subresources get a stand-in (no-op SDK, empty VAST, blank clip...) or an empty 204; `$replace` rules rewrite the rest. */
+    private fun protect(request: WebResourceRequest): WebResourceResponse? {
+        if (!adBlock || request.isForMainFrame) return null
+        val filter = filterRequest(request)
+        val verdict = AdBlock.verdict(filter)
+        if (!verdict.blocked) return ContentRewriter.rewrite(request, filter)
         blocked.incrementAndGet()
-        return WebResourceResponse("text/plain", "utf-8", 204, "No Content", emptyMap(), ByteArrayInputStream(ByteArray(0)))
+        return verdict.redirect?.let { RedirectResources.response(it, request) }
+            ?: WebResourceResponse("text/plain", "utf-8", 204, "No Content", emptyMap(), ByteArrayInputStream(ByteArray(0)))
     }
     private fun filterRequest(request: WebResourceRequest): app.momiji.net.FilterRequest {
         val headers=request.requestHeaders.entries.associate { it.key.lowercase() to it.value.lowercase() }
@@ -689,7 +712,12 @@ class MainActivity : Activity(), RemoteControl.Target {
             else filters.execute {
                 var ready=false
                 while(!ready && !Thread.currentThread().isInterrupted) ready=FilterRepository.awaitReady() && FilterRepository.awaitIdle()
-                if(ready && !Thread.currentThread().isInterrupted) web.post { if(webAlive && version==navigationVersion) web.loadUrl(url) }
+                if(ready && !Thread.currentThread().isInterrupted) web.post {
+                    if(!webAlive || version!=navigationVersion) return@post
+                    // Raw JS rules are registered per filter generation; the first load may come before filters were ready.
+                    if(scriptsRevision!=FilterRepository.revision) installStartScript()
+                    web.loadUrl(url)
+                }
             }
         }
     }
@@ -760,6 +788,32 @@ class MainActivity : Activity(), RemoteControl.Target {
             val fallback = intent.getStringExtra("browser_fallback_url")
             if (fallback != null && fallback.startsWith("http")) load(fallback) else say(getString(R.string.no_app))
         }
+    }
+
+    /**
+     * Single-view browser: an allowed new window replaces the page, as before. Filtered popups are dropped,
+     * and a script on another site opening a window (the classic popunder) has to ask first.
+     */
+    private fun openWindow(url: String, opener: String, link: String?, gesture: Boolean) {
+        if (!webAlive) return
+        val uri = Uri.parse(url)
+        if (uri.scheme !in setOf("http", "https")) {
+            if (!gesture) say(getString(R.string.app_blocked))
+            else if (uri.scheme == "intent") openIntent(url)
+            else if (!openExternal(Intent(Intent.ACTION_VIEW, uri))) say(getString(R.string.no_app))
+            return
+        }
+        if (adBlock && AdBlock.popupBlocked(url, opener)) {
+            blocked.incrementAndGet()
+            say(getString(R.string.popup_blocked))
+            return
+        }
+        val sameSite = FilterRepository.site(uri.host.orEmpty()) == FilterRepository.site(Uri.parse(opener).host.orEmpty())
+        if (!adBlock || !protection.blockPopups || sameSite || link == url) { load(url); return }
+        val dialog = AlertDialog.Builder(this).setTitle(R.string.popup_title).setMessage(getString(R.string.popup_ask, uri.host))
+            .setPositiveButton(R.string.popup_open) { _, _ -> load(url) }
+            .setNegativeButton(R.string.popup_stay, null).show()
+        dialog.getButton(AlertDialog.BUTTON_NEGATIVE)?.requestFocus()
     }
 
     private fun openExternal(intent: Intent): Boolean = try {
@@ -1098,19 +1152,18 @@ class MainActivity : Activity(), RemoteControl.Target {
             cleanedEpoch = pageEpoch
             view.evaluateJavascript(pageScript + ";window.__momijiPage&&window.__momijiPage.configure(${inputConfig()});" +
                 "window.momiji&&window.momiji.setInputMode('${if (pointerMode) "pointer" else "keys"}')", null)
-            if (!adBlock || protection.siteAllowed(Uri.parse(url).host.orEmpty())) return
-            view.evaluateJavascript(AdBlock.COSMETIC_JS, null)
-            val host = Uri.parse(url).host ?: return
+            // Without document-start scripts the shield can only arrive late, and only in the main frame.
+            if (!adBlock || WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) return
             val epoch = pageEpoch
             filters.execute {
-                val script = Cosmetic.script(host) ?: return@execute
+                val script = ShieldScript.shield(this@MainActivity)
                 view.post { if (webAlive && epoch == pageEpoch && adBlock) view.evaluateJavascript(script, null) }
             }
         }
 
         override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? {
             assetsLoader.shouldInterceptRequest(request.url)?.let { return it }
-            blockedResponse(request)?.let { return it }
+            protect(request)?.let { return it }
             media.capture(request.url.toString(), request.requestHeaders)
             return null
         }
@@ -1127,6 +1180,31 @@ class MainActivity : Activity(), RemoteControl.Target {
     }
 
     private inner class Chrome : WebChromeClient() {
+
+        /** A throwaway view only learns where the new window wants to go; nothing is rendered in it. */
+        override fun onCreateWindow(view: WebView, isDialog: Boolean, isUserGesture: Boolean, resultMsg: Message): Boolean {
+            val opener = view.url ?: return false
+            val hit = view.hitTestResult
+            val link = hit.extra.takeIf { hit.type == WebView.HitTestResult.SRC_ANCHOR_TYPE || hit.type == WebView.HitTestResult.SRC_IMAGE_ANCHOR_TYPE }
+            val catcher = WebView(this@MainActivity)
+            var handled = false
+            fun take(url: String) {
+                if (handled) return
+                handled = true
+                catcher.stopLoading()
+                // The catcher is never attached, so its own post() would wait forever; the page view runs these.
+                web.post { catcher.destroy() }
+                openWindow(url, opener, link, isUserGesture)
+            }
+            catcher.webViewClient = object : WebViewClient() {
+                override fun shouldOverrideUrlLoading(v: WebView, request: WebResourceRequest): Boolean { take(request.url.toString()); return true }
+                override fun onPageStarted(v: WebView, url: String, favicon: Bitmap?) { if (url != "about:blank") take(url) }
+            }
+            web.postDelayed({ if (!handled) { handled = true; catcher.destroy() } }, 10_000)
+            (resultMsg.obj as WebView.WebViewTransport).webView = catcher
+            resultMsg.sendToTarget()
+            return true
+        }
 
         override fun onProgressChanged(view: WebView, newProgress: Int) {
             progress.progress = newProgress

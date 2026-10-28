@@ -13,6 +13,12 @@
       "bytes": 7911762,
       "http_date": "Tue, 27 Oct 2026 17:31:36 GMT"
     },
+    "mobile": {
+      "url": "https://raw.githubusercontent.com/AdguardTeam/FiltersRegistry/master/filters/filter_11_Mobile/filter.txt",
+      "sha256": "4a72f372e8063f2bb5c44ac05ab2e64755a89320a39bf5a87857aabf7bfe5c5d",
+      "bytes": 641745,
+      "http_date": "Wed, 28 Oct 2026 20:36:11 GMT"
+    },
     "russian": {
       "url": "https://raw.githubusercontent.com/AdguardTeam/FiltersRegistry/master/filters/filter_1_Russian/filter.txt",
       "sha256": "f7e4587e46276e221414a9724d85df3303339bfe7fe039f3ee30b579b3c8082d",

@@ -75,9 +75,16 @@ object AdBlock {
 
     val size get() = maxOf(rules.blocked.size,offline?.size ?: 0) + builtIn.size
 
+    /** [redirect] is a stand-in from [RedirectResources] to serve instead of an error, when one fits. */
+    data class Verdict(val blocked: Boolean,val redirect: String?=null)
+    private val flagCache=object: LinkedHashMap<String,Int>(64,.75f,true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String,Int>?)=size>64
+    }
+
     fun init(context: Context) {
         if (!initialized.compareAndSet(false, true)) return
         preferences=ProtectionPreferences(context)
+        RedirectResources.init(context)
         FilterRepository.start(context)
     }
 
@@ -102,10 +109,46 @@ object AdBlock {
             atomic.finishWrite(output)
         } catch(error: Exception) { atomic.failWrite(output); throw error }
     }
-    fun blocks(request: FilterRequest): Boolean {
-        if(preferences?.siteAllowed(request.documentHost)==true) return false
-        val contextual=RuleDecision.stronger(FilterRepository.advanced?.decision(request),FilterRepository.custom?.decision(request))
-        return RuleDecision.stronger(contextual,domainDecision(request.host))?.blocked==true
+    fun blocks(request: FilterRequest): Boolean = verdict(request).blocked
+
+    fun verdict(request: FilterRequest): Verdict {
+        if(preferences?.siteAllowed(request.documentHost)==true) return Verdict(false)
+        val base=FilterRepository.advanced; val custom=FilterRepository.custom
+        val contextual=RuleDecision.stronger(base?.decision(request),custom?.decision(request))
+        // DNS-style domain lists describe hosts, not new windows; popups follow `$popup` rules only.
+        val host=if(request.type==ResourceType.POPUP) null else domainDecision(request.host)
+        val final=RuleDecision.stronger(contextual,host)
+        if(final?.blocked!=true) return Verdict(false)
+        val redirect=final.redirect ?: custom?.redirectRule(request) ?: base?.redirectRule(request) ?: Surrogates.fallback(request.url,request.type)
+        return Verdict(true,redirect?.takeIf(RedirectResources::has))
+    }
+
+    /** A new window is refused when a `$popup` rule names it or its address is blocked as a page. */
+    fun popupBlocked(url: String,opener: String)=
+        verdict(FilterRequest(url,opener,ResourceType.POPUP)).blocked || verdict(FilterRequest(url,opener,ResourceType.DOCUMENT)).blocked
+
+    /** [PageFlags] for a document: list exceptions plus the user's own site exceptions. */
+    fun pageFlags(url: String): Int {
+        synchronized(flagCache) { flagCache[url]?.let { return it } }
+        val host=FilterRequest(url).host
+        val flags=if(host.isNotEmpty() && preferences?.siteAllowed(host)==true) PageFlags.ALL
+            else (FilterRepository.advanced?.pageFlags(url) ?: 0) or (FilterRepository.custom?.pageFlags(url) ?: 0)
+        synchronized(flagCache) { flagCache[url]=flags }
+        return flags
+    }
+    fun clearCaches() { synchronized(flagCache) { flagCache.clear() } }
+
+    private fun content(request: FilterRequest,kind: ContentKind): List<String> =
+        ((FilterRepository.advanced?.content(request,kind) ?: emptyList())+(FilterRepository.custom?.content(request,kind) ?: emptyList())).distinct()
+
+    fun jsonPrune(url: String,page: String): List<String> = content(FilterRequest(url,page,ResourceType.XMLHTTPREQUEST),ContentKind.JSONPRUNE)
+    fun hasJsonPrune(page: String)=FilterRepository.advanced?.hasContentFor(page,ContentKind.JSONPRUNE)==true || FilterRepository.custom?.hasContentFor(page,ContentKind.JSONPRUNE)==true
+    fun replaceRules(request: FilterRequest): List<Triple<String,String,String>> = content(request,ContentKind.REPLACE).mapNotNull(RequestRules::replaceParts)
+
+    /** HLS media playlist without its ad segments (cue markers, `$hls` rules, blocked hosts), or null to keep it. */
+    fun prunePlaylist(text: String,url: String,page: String): String? {
+        val rules=content(FilterRequest(url,page,ResourceType.XMLHTTPREQUEST),ContentKind.HLS).mapNotNull(HlsPruner::rule)
+        return HlsPruner.prune(text,url,rules) { segment -> verdict(FilterRequest(segment,page,ResourceType.MEDIA)).blocked }?.text
     }
     private fun domainDecision(value: String): RuleDecision? {
         val normalized=DomainTable.normalizeHost(value)
@@ -153,8 +196,4 @@ object AdBlock {
 
         fun sorted(): LongArray = data.copyOf(n).also { it.sort() }
     }
-
-
-    const val COSMETIC_JS = """(function(){if(document.getElementById('momiji-ab'))return;var s=document.createElement('style');s.id='momiji-ab';s.textContent='ins.adsbygoogle,[id^="google_ads_"],[id^="div-gpt-ad"],iframe[src*="doubleclick.net"],iframe[src*="googlesyndication"],[id^="yandex_rtb"],[id^="adfox_"],[id^="AdFox"],div[class^="adfox"],[data-ad-slot],[data-adfox],[data-google-query-id],.adsbox,.ad-banner,.advertisement,[aria-label="Реклама"],[aria-label="Advertisement"]{display:none!important}';(document.head||document.documentElement).appendChild(s);})()"""
-
 }

@@ -39,7 +39,7 @@ class ProxyMediaDataSource(private val context: Context,private val defaults: Ma
         try {
             repeat(11) { attempt ->
                 if(Thread.currentThread().isInterrupted) throw InterruptedIOException()
-                if(Store(context).adBlock && AdBlock.blocks(FilterRequest(url.toString(),headers["Referer"].orEmpty(),ResourceType.MEDIA))) throw IOException("Ресурс заблокирован фильтром Momiji")
+                // Filtering happens once, in FilteringMediaFactory, which wraps this source and never fails segments mid-stream.
                 require(url.protocol in setOf("http","https") && url.userInfo==null)
                 val conn=NetworkRoute.open(url); connection=conn
                 conn.connectTimeout=12000; conn.readTimeout=20000; conn.instanceFollowRedirects=false; conn.requestMethod=method

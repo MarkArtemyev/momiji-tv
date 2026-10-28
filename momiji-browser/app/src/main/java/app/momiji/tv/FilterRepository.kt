@@ -31,6 +31,7 @@ object FilterRepository {
     private var psl: PublicSuffixes?=null
     private val sources=linkedMapOf("dns" to listOf("https://adguardteam.github.io/AdGuardSDNSFilter/Filters/filter.txt"),
         "base" to listOf("https://filters.adtidy.org/extension/chromium/filters/2.txt","https://raw.githubusercontent.com/AdguardTeam/FiltersRegistry/master/filters/filter_2_Base/filter.txt"),
+        "mobile" to listOf("https://filters.adtidy.org/extension/chromium/filters/11.txt","https://raw.githubusercontent.com/AdguardTeam/FiltersRegistry/master/filters/filter_11_Mobile/filter.txt"),
         "russian" to listOf("https://filters.adtidy.org/extension/chromium/filters/1.txt","https://raw.githubusercontent.com/AdguardTeam/FiltersRegistry/master/filters/filter_1_Russian/filter.txt"),
         "privacy" to listOf("https://filters.adtidy.org/extension/chromium/filters/3.txt","https://raw.githubusercontent.com/AdguardTeam/FiltersRegistry/master/filters/filter_3_Spyware/filter.txt"))
     fun start(context: Context) {
@@ -49,7 +50,11 @@ object FilterRepository {
         }
     }
     private fun waitFor(latch: CountDownLatch): Boolean=try { latch.await(8,TimeUnit.SECONDS) } catch(_: InterruptedException) { Thread.currentThread().interrupt(); false }
+    /** Ad lists first: the object budget in RequestRules must never be spent on tracking pixels before ads. */
+    private val lists=listOf("base","mobile","russian","privacy")
     fun awaitReady()=waitFor(ready)
+    /** Registrable domain, for same-site checks. */
+    fun site(host: String): String=psl?.site(host) ?: host
     fun awaitIdle(): Boolean { val barrier=CountDownLatch(1); executor.execute { barrier.countDown() }; return waitFor(barrier) }
     fun rebuildCustom(context: Context) {
         val app=context.applicationContext
@@ -81,7 +86,7 @@ object FilterRepository {
                     require(network.count>1000)
                     AdBlock.validateDns(read(app,directory,"dns"))
                     network.write(File(directory,"network.bin").outputStream())
-                    val cosmetic=Cosmetic.compile(read(app,directory,"base").lines(),read(app,directory,"russian").lines())
+                    val cosmetic=Cosmetic.compile(lists.map { read(app,directory,it) })
                     File(directory,"cosmetic.txt").writeText(cosmetic)
                     manifest.put("networkBinary",sha(File(directory,"network.bin").readBytes())).put("cosmeticBinary",sha(cosmetic.toByteArray()))
                     File(directory,"manifest.json").writeText(manifest.toString())
@@ -122,25 +127,27 @@ object FilterRepository {
         return stream.use { decoded -> decoded.readBytesBounded(20*1024*1024).toString(Charsets.UTF_8) }
     }
     private fun readNetwork(context: Context,directory: File?): RequestRules {
-        if(directory==null) return RequestRules(context.assets.open("protection/network.bin"),psl ?: error("No suffix list"))
-        val compiled=File(directory,"network.bin")
-        if(compiled.isFile) return RequestRules(compiled.inputStream(),psl ?: error("No suffix list"))
-        return readNetworkText(context,directory,emptyList())
+        val suffixes=psl ?: error("No suffix list")
+        // A cache from an older engine (or a damaged one) is rebuilt from the lists instead of failing.
+        val compiled=runCatching {
+            if(directory==null) RequestRules(context.assets.open("protection/network.bin"),suffixes)
+            else File(directory,"network.bin").takeIf { it.isFile }?.inputStream()?.let { RequestRules(it,suffixes) }
+        }.getOrNull()
+        return compiled ?: readNetworkText(context,directory,emptyList())
     }
     private fun readNetworkText(context: Context,directory: File?,additional: List<String>): RequestRules {
         val lines=ArrayList<String>()
-        for(name in listOf("base","russian","privacy")) lines.addAll(read(context,directory,name).lineSequence().filter {
-            it.length in 2..8192 && !it.startsWith('!') && !it.startsWith('[') && !it.contains('#') &&
-                !listOf("removeparam=","redirect=","redirect-rule=","replace=","csp=","permissions=","urltransform=","removeheader=").any(it::contains)
-        }.toList())
+        // Directives (`!#if`, `!+ PLATFORM`) must reach the parser; it skips comments and unsupported rules itself.
+        for(name in lists) lines.addAll(read(context,directory,name).lineSequence().filter { it.length in 2..8192 }.toList())
         lines.addAll(additional)
         return RequestRules(lines,psl ?: error("Public suffix list unavailable"))
     }
     private fun install(context: Context,directory: File?,network: RequestRules?=null) {
         if(directory==null) AdBlock.installOffline(context) else AdBlock.installDns(read(context,directory,"dns"))
         baseRules=network ?: readNetwork(context,directory); currentDirectory=directory
-        compiledCosmetic=if(directory==null) context.assets.open("protection/cosmetic.txt").bufferedReader().use { it.readText() }
-            else File(directory,"cosmetic.txt").takeIf { it.isFile }?.readText() ?: Cosmetic.compile(read(context,directory,"base").lines(),read(context,directory,"russian").lines())
+        val cached=if(directory==null) context.assets.open("protection/cosmetic.txt").bufferedReader().use { it.readText() }
+            else File(directory,"cosmetic.txt").takeIf { it.isFile }?.readText()
+        compiledCosmetic=cached?.takeIf { it.startsWith(CosmeticRules.HEADER+"\n") } ?: Cosmetic.compile(lists.map { read(context,directory,it) })
         applyCustom(context)
         updatedAt=if(directory!=null) JSONObject(File(directory,"manifest.json").readText()).optLong("time") else {
             val date=JSONObject(context.assets.open("protection/manifest.json").bufferedReader().use { it.readText() }).getString("session_date")
@@ -153,7 +160,8 @@ object FilterRepository {
         val lines=ProtectionPreferences(context).customRules.lines()
         if(lines.any { it.contains("badfilter") }) { advanced=readNetworkText(context,currentDirectory,lines); custom=null }
         else { advanced=baseRules; custom=RequestRules(lines,psl ?: error("No suffix list")) }
-        Cosmetic.installCompiled(compiledCosmetic,lines)
+        Cosmetic.installCompiled(compiledCosmetic,lines,psl ?: error("No suffix list"))
+        AdBlock.clearCaches()
         revision++
     }
     private fun fetch(url: String): ByteArray {
