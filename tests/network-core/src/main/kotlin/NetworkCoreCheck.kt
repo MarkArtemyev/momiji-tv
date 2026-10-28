@@ -49,6 +49,37 @@ fun main(args: Array<String>) {
             FilterRequest("https://disabled.example/font.woff","https://site.co.uk",ResourceType.FONT))
         for(sample in samples) check(restored.decision(sample)==rules.decision(sample))
     }
+    test("strongest_decision_priority_and_exception_ties") {
+        val block=RuleDecision(true,1); val allow=RuleDecision(false,2); val forced=RuleDecision(true,3); val forcedAllow=RuleDecision(false,4)
+        check(RuleDecision.stronger(null,null)==null); check(RuleDecision.stronger(block,null)==block); check(RuleDecision.stronger(null,allow)==allow)
+        check(RuleDecision.stronger(block,allow)==allow); check(RuleDecision.stronger(allow,block)==allow)
+        check(RuleDecision.stronger(allow,forced)==forced); check(RuleDecision.stronger(forced,forcedAllow)==forcedAllow)
+        // An exception wins a tie from either side; equal blocks stay blocked.
+        val tiedAllow=RuleDecision(false,1)
+        check(RuleDecision.stronger(block,tiedAllow)==tiedAllow); check(RuleDecision.stronger(tiedAllow,block)==tiedAllow)
+        check(RuleDecision.stronger(block,RuleDecision(true,1))?.blocked==true)
+    }
+    test("base_custom_and_domain_layers_merge_like_the_browser") {
+        // Mirrors AdBlock.blocks: base and custom page rules first, then the DNS domain table.
+        val base=RequestRules(listOf("||tracker.example^","||cdn.example/ads/*"),suffix)
+        val custom=RequestRules(listOf("@@||tracker.example/consent.js","||cdn.example/extra.js\$important"),suffix)
+        val table=ByteArrayOutputStream().also { bytes -> DataOutputStream(bytes).use { data ->
+            val blocked=listOf("dns-only.example","cdn.example").map { DomainTable.hash(it) }.sorted(); val allowed=listOf("ok.dns-only.example").map { DomainTable.hash(it) }.sorted()
+            data.writeInt(0x4d444e31); data.writeInt(blocked.size); data.writeInt(allowed.size); blocked.forEach(data::writeLong); allowed.forEach(data::writeLong)
+        } }.toByteArray().let { DomainTable(it.inputStream()) }
+        fun merged(url: String): Boolean {
+            val request=FilterRequest(url,"https://www.site.co.uk/",ResourceType.SCRIPT)
+            val contextual=RuleDecision.stronger(base.decision(request),custom.decision(request))
+            return RuleDecision.stronger(contextual,table.decision(request.host))?.blocked==true
+        }
+        check(merged("https://tracker.example/pixel.js")); check(!merged("https://tracker.example/consent.js"))
+        check(merged("https://dns-only.example/a.js")); check(!merged("https://ok.dns-only.example/a.js"))
+        check(merged("https://cdn.example/extra.js")); check(!merged("https://unrelated.example/app.js"))
+        // A page exception (priority 2) beats a plain domain-table block (priority 1).
+        val unblock=RequestRules(listOf("@@||cdn.example/lib/"),suffix)
+        val lib=FilterRequest("https://cdn.example/lib/app.js","https://www.site.co.uk/",ResourceType.SCRIPT)
+        check(RuleDecision.stronger(unblock.decision(lib),table.decision(lib.host))?.blocked==false)
+    }
     test("multi_record_hello_fragmentation_preserves_every_handshake_byte") {
         fun u16(n: Int)=byteArrayOf((n ushr 8).toByte(),n.toByte())
         val host="fixture.momiji.test".toByteArray()

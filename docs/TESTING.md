@@ -29,7 +29,9 @@ Android checks used an API 35 x86_64 emulator at 1280×720. It used a phone syst
 ./momiji-browser/gradlew -p tests/network-core networkCheck --max-workers=1
 ```
 
-The 18-check suite starts local loopback fixtures and generates a short-lived PKCS12 certificate under its ignored build directory. It does not connect to a TV or use a production key. The pure-JVM suite covers filtering and transport; it does not substitute for Android WebView/media checks or test public resolver reachability.
+The 20-check suite starts local loopback fixtures and generates a short-lived PKCS12 certificate under its ignored build directory. It does not connect to a TV or use a production key. The pure-JVM suite covers filtering, the browser's merge of page, custom and DNS-table decisions, and transport; it does not substitute for Android WebView/media checks or test public resolver reachability.
+
+The Android scenarios in the table above were run with a local emulator harness that is not part of this repository. The only Android-side check in the tree is the debug-build store check: `adb shell am start -n app.momiji.home/.HomeActivity --ez self_check true` writes `store-self-check.json` to the app's files directory.
 
 TLS-record fragmentation remains in the core suite for protocol regression coverage. Named Android WebView interoperability failed for that mode, so the product exposes only normal routing, TCP splitting and external SOCKS5. Legacy experimental TLS preferences migrate to TCP.
 

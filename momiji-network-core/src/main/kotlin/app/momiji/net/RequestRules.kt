@@ -24,7 +24,16 @@ class PublicSuffixes(text: String) {
 }
 
 enum class ResourceType { DOCUMENT,SUBDOCUMENT,SCRIPT,STYLESHEET,IMAGE,FONT,MEDIA,XMLHTTPREQUEST,WEBSOCKET,PING,OTHER }
-data class RuleDecision(val blocked: Boolean,val priority: Int)
+data class RuleDecision(val blocked: Boolean,val priority: Int) {
+    companion object {
+        /** Higher priority wins; on a tie an exception beats a block. */
+        fun stronger(a: RuleDecision?,b: RuleDecision?): RuleDecision? = when {
+            a==null->b; b==null->a
+            a.priority!=b.priority->if(a.priority>b.priority) a else b
+            else->if(!a.blocked) a else b
+        }
+    }
+}
 data class FilterRequest(val url: String,val documentUrl: String="",val type: ResourceType=ResourceType.OTHER) {
     val host=runCatching { DomainTable.normalizeHost(URI(url).host.orEmpty()) }.getOrDefault("")
     val documentHost=runCatching { DomainTable.normalizeHost(URI(documentUrl).host.orEmpty()) }.getOrDefault("")
@@ -61,7 +70,7 @@ class RequestRules private constructor(private val suffixes: PublicSuffixes) {
             if(rule.documentException && rule.host!=null) documents.getOrPut(rule.host) { ArrayList() }.add(rule)
             if(rule.host!=null) hosts.getOrPut(rule.host) { ArrayList() }.add(rule)
             else {
-                val literal=Regex("[a-zA-Z0-9_%.-]{3,}").findAll(rule.pattern).map { it.value }.maxByOrNull { it.length }
+                val literal=TOKEN.findAll(rule.pattern).map { it.value }.maxByOrNull { it.length }
                 if(literal!=null) keywords.getOrPut(trigram(literal.lowercase(),0)) { ArrayList() }.add(rule)
                 else if(fallback.size<128 || rule.allow) fallback.add(rule) else { count--; skipped++ }
             }
@@ -85,14 +94,6 @@ class RequestRules private constructor(private val suffixes: PublicSuffixes) {
                 else if(bucket<0) fallback.add(rule) else keywords.getOrPut(bucket) { ArrayList() }.add(rule)
             }
             require(data.read()==-1)
-        }
-    }
-    private fun index(rule: Rule) {
-        if(rule.documentException && rule.host!=null) documents.getOrPut(rule.host) { ArrayList() }.add(rule)
-        if(rule.host!=null) hosts.getOrPut(rule.host) { ArrayList() }.add(rule)
-        else {
-            val literal=TOKEN.findAll(rule.pattern).map { it.value }.maxByOrNull { it.length }
-            if(literal!=null) keywords.getOrPut(trigram(literal.lowercase(),0)) { ArrayList() }.add(rule) else fallback.add(rule)
         }
     }
     fun write(output: java.io.OutputStream) {

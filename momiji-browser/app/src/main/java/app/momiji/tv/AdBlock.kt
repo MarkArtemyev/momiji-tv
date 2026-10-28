@@ -71,9 +71,7 @@ object AdBlock {
     private val initialized = AtomicBoolean()
     @Volatile private var offline: DomainTable?=null
     @Volatile private var preferences: ProtectionPreferences?=null
-    private val decisions = object : LinkedHashMap<String, Boolean>(512, .75f, true) {
-        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Boolean>?) = size > 512
-    }
+    private val lock = Any()
 
     val size get() = maxOf(rules.blocked.size,offline?.size ?: 0) + builtIn.size
 
@@ -85,11 +83,11 @@ object AdBlock {
 
     fun installOffline(context: Context) {
         val table=DomainTable(context.assets.open("protection/domains.bin"))
-        synchronized(decisions) { offline=table; rules=Rules(LongArray(0),LongArray(0)); decisions.clear() }
+        synchronized(lock) { offline=table; rules=Rules(LongArray(0),LongArray(0)) }
     }
     fun installDns(text: String) {
         val parsed=parse(text.lineSequence()); require(parsed.blocked.size>1000)
-        synchronized(decisions) { rules=parsed; offline=null; decisions.clear() }
+        synchronized(lock) { rules=parsed; offline=null }
     }
     fun validateDns(text: String) { require(parse(text.lineSequence()).blocked.size>1000) }
     fun saveSnapshot(context: Context) {
@@ -106,51 +104,21 @@ object AdBlock {
     }
     fun blocks(request: FilterRequest): Boolean {
         if(preferences?.siteAllowed(request.documentHost)==true) return false
-        val base=FilterRepository.advanced?.decision(request)
-        val custom=FilterRepository.custom?.decision(request)
-        val contextual=when { base==null->custom; custom==null->base; custom.priority>=base.priority->if(custom.priority==base.priority && custom.blocked && !base.blocked) base else custom; else->base }
-        val host=domainDecision(request.host)
-        val winner=when { contextual==null->host; host==null->contextual
-            contextual.priority>host.priority->contextual
-            contextual.priority<host.priority->host
-            else->if(!contextual.blocked) contextual else host }
-        return winner?.blocked==true
+        val contextual=RuleDecision.stronger(FilterRepository.advanced?.decision(request),FilterRepository.custom?.decision(request))
+        return RuleDecision.stronger(contextual,domainDecision(request.host))?.blocked==true
     }
     private fun domainDecision(value: String): RuleDecision? {
         val normalized=DomainTable.normalizeHost(value)
         offline?.let { table -> return table.decision(normalized) ?: if(builtIn.any { normalized==it || normalized.endsWith(".$it") }) RuleDecision(true,1) else null }
         val table=rules; var block=false; var host=normalized
         while(host.isNotEmpty()) {
-            val key=hash(host)
+            val key=DomainTable.hash(host)
+            // Any matching exception wins, including a permitted child of a blocked parent.
             if(table.allowed.binarySearch(key)>=0) return RuleDecision(false,2)
             if(host in builtIn || table.blocked.binarySearch(key)>=0) block=true
             val at=host.indexOf('.'); if(at<0) break; host=host.substring(at+1)
         }
         return if(block) RuleDecision(true,1) else null
-    }
-
-    fun blocks(host: String): Boolean {
-        val h = host.lowercase().trimEnd('.')
-        return synchronized(decisions) {
-            decisions[h] ?: lookup(h).also { decisions[h] = it }
-        }
-    }
-
-    private fun lookup(h: String): Boolean {
-        offline?.let { return domainDecision(h)?.blocked==true }
-        val table = rules
-        var blocked = false
-        var start = 0
-        while (true) {
-            val suffix = h.substring(start)
-            val key = hash(suffix)
-            // Any matching exception wins, including a permitted child of a blocked parent.
-            if (table.allowed.binarySearch(key) >= 0) return false
-            if (suffix in builtIn || table.blocked.binarySearch(key) >= 0) blocked = true
-            val dot = h.indexOf('.', start)
-            if (dot < 0) return blocked
-            start = dot + 1
-        }
     }
 
     private fun parse(lines: Sequence<String>): Rules {
@@ -164,7 +132,7 @@ object AdBlock {
             // This host matcher has no request-type, document, party or DNS context.
             // Unsupported modifiers must never become unconditional blocks or exceptions.
             if (options.isNotEmpty() && options != "badfilter") continue
-            val key = hash(m.groupValues[2])
+            val key = DomainTable.hash(m.groupValues[2])
             val exception = m.groupValues[1].isNotEmpty()
             if (options == "badfilter") {
                 (if (exception) disabledAllows else disabledBlocks).add(key)
@@ -172,15 +140,6 @@ object AdBlock {
         }
         return Rules(blocked.sorted().filter { it !in disabledBlocks }.distinct().toLongArray(),
             allowed.sorted().filter { it !in disabledAllows }.distinct().toLongArray())
-    }
-
-    private fun hash(s: String): Long {
-        var h = -0x340d631b7bdddcdbL
-        for (c in s) {
-            h = h xor c.code.toLong()
-            h *= 0x100000001b3L
-        }
-        return h
     }
 
     private class Longs {
