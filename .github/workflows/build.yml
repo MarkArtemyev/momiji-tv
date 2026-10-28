@@ -30,6 +30,12 @@ jobs:
             **/gradle-wrapper.properties
       - name: Core integration checks
         run: ./momiji-browser/gradlew -p tests/network-core networkCheck --no-daemon --max-workers=1
+      - name: Shield checks in Chromium
+        working-directory: tests/web-shield
+        run: |
+          npm ci --no-audit --no-fund
+          npx playwright install --with-deps chromium
+          node run.js
       - name: Browser build and lint
         run: ./momiji-browser/gradlew -p momiji-browser :app:assembleDebug :app:assembleRelease :app:lintDebug --no-daemon --max-workers=1
       - name: Home build and lint

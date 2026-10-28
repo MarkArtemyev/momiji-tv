@@ -1,0 +1,7 @@
+{
+  "name": "momiji-web-shield-checks",
+  "private": true,
+  "description": "Shield checks in Chromium; run after the network-core suite, which writes the real payloads.",
+  "scripts": { "test": "node run.js" },
+  "devDependencies": { "playwright": "1.63.0" }
+}

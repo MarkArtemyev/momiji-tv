@@ -2,7 +2,7 @@
 
 ## AdGuard filter data
 
-Bundled AdGuard DNS, Base, Russian and Tracking Protection lists are provided by the AdGuard Team under GPL-3.0. Original downloaded snapshots, their manifests and the full license text are preserved under `momiji-browser/app/src/main/assets/protection/`.
+Bundled AdGuard DNS, Base, Mobile Ads, Russian and Tracking Protection lists are provided by the AdGuard Team under GPL-3.0. Original downloaded snapshots, their manifests and the full license text are preserved under `momiji-browser/app/src/main/assets/protection/`.
 
 The compact domain table, serialized supported-rule table and normalized cosmetic table are derived data. Home bundles the domain table and license; the corresponding original DNS snapshot is included with Browser in the same repository.
 
@@ -13,6 +13,13 @@ Official projects and sources:
 - https://github.com/AdguardTeam/AdguardFilters
 
 The source URL and SHA-256 of each snapshot are recorded in the bundled `manifest.json`. Runtime updates use the configured official endpoints with a mirror fallback where implemented. No claim of full AdGuard engine or syntax compatibility is made.
+
+## AdGuard Scriptlets and ExtendedCss
+
+The browser bundles unmodified builds of AdGuard Scriptlets (the corelibs build of each scriptlet, and its redirect resources) and AdGuard ExtendedCss, both GPL-3.0 by AdGuard Software Ltd. They are stored with their license and versions under `momiji-browser/app/src/main/assets/protection/vendor/` and regenerated from the published npm packages by `tools/vendor-adguard.mjs`.
+
+- https://github.com/AdguardTeam/Scriptlets (`@adguard/scriptlets`)
+- https://github.com/AdguardTeam/ExtendedCss (`@adguard/extended-css`)
 
 ## Public Suffix List
 

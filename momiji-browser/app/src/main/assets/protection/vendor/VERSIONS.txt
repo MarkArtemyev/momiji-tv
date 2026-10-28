@@ -1,0 +1,2 @@
+@adguard/scriptlets 2.5.1
+@adguard/extended-css 2.3.0

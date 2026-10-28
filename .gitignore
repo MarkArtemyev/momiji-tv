@@ -20,3 +20,4 @@ Thumbs.db
 *.log
 *.hprof
 __pycache__/
+**/node_modules/
