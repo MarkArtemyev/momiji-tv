@@ -58,6 +58,14 @@ DRM, opaque blob/MSE streams and some authenticated players still need the websi
 
 The shared settings screen includes offline domain filtering, contextual URL rules, cosmetic hiding, custom rules, site exceptions, popup controls and third-party cookie settings.
 
+The browser reads the AdGuard Base, Mobile Ads, Russian and Tracking Protection lists the way the AdGuard Chromium extension does, and runs AdGuard's own open-source page engines for them:
+
+- **Scriptlets** (AdGuard Scriptlets, AdGuard `#%#//scriptlet` and uBO `##+js` syntax) run in every frame before page scripts, without eval, so strict-CSP sites are covered too.
+- **Stand-ins instead of errors**: blocked ad SDKs, VAST/VMAP, clips and pixels are answered with AdGuard's no-op resources (`$redirect`, `$redirect-rule`, plus built-in fallbacks for IMA, GPT, AdSense and analytics), so players skip straight to the video.
+- **Video ads**: HLS VOD playlists lose server-inserted ad segments (SCTE-35 cues, `$hls` rules, blocked ad hosts) in web players and in the native player; JSON player APIs are cleaned with `$jsonprune`, and `$replace` rewrites VAST and scripts.
+- **Popups and popunders**: `$popup` rules, plus a confirmation before a script on another site may replace the page.
+- **Hiding**: element hiding, ExtendedCss (`:has-text`, `:upward`, `:remove`...), CSS injection, and the 14k generic selectors applied only for classes and ids a page really uses.
+
 | Setting | Behavior |
 | --- | --- |
 | Default | Normal routing, system DNS, filtering enabled |
@@ -67,7 +75,7 @@ The shared settings screen includes offline domain filtering, contextual URL rul
 | Home coverage | Home's own artwork requests |
 | Browser coverage | Website requests, supported background requests and native media requests |
 
-No root access, interception certificate or Android VPN service is required for these network options. TCP splitting does not hide your IP or increase your connection's bandwidth. Effectiveness depends on the network; IP/protocol blocks, QUIC and server-side video ads are not universally handled. Other apps' traffic is outside the filter's scope.
+No root access, interception certificate or Android VPN service is required for these network options. TCP splitting does not hide your IP or increase your connection's bandwidth. Effectiveness depends on the network; IP/protocol blocks and QUIC are not universally handled. Server-side ads stitched into live streams without markers can remain. Other apps' traffic, including the YouTube TV app, is outside the filter's scope.
 
 <details>
 <summary><strong>See network settings</strong></summary>

@@ -29,7 +29,19 @@ Android checks used an API 35 x86_64 emulator at 1280×720. It used a phone syst
 ./momiji-browser/gradlew -p tests/network-core networkCheck --max-workers=1
 ```
 
-The 20-check suite starts local loopback fixtures and generates a short-lived PKCS12 certificate under its ignored build directory. It does not connect to a TV or use a production key. The pure-JVM suite covers filtering, the browser's merge of page, custom and DNS-table decisions, and transport; it does not substitute for Android WebView/media checks or test public resolver reachability.
+The 36-check suite starts local loopback fixtures and generates a short-lived PKCS12 certificate under its ignored build directory. It does not connect to a TV or use a production key. The pure-JVM suite covers filtering (list directives and platform hints, `$popup`, `$redirect`, page exceptions, `$replace`/`$hls`/`$jsonprune`), cosmetic and scriptlet compilation, HLS ad pruning, the browser's merge of page, custom and DNS-table decisions, and transport. It also compiles the bundled lists with the new engine and checks the heap they need (about 25 MiB on the JVM). It does not substitute for Android WebView/media checks or test public resolver reachability.
+
+## Run the shield suite in Chromium
+
+```sh
+npm ci --prefix tests/web-shield
+npx --prefix tests/web-shield playwright install chromium
+node tests/web-shield/run.js
+```
+
+Run it after the core suite, which writes the real payloads the Kotlin core builds for some hosts. The suite installs exactly the document-start script the browser uses (AdGuard Scriptlets, ExtendedCss and `shield.js`) with a mock of the Kotlin bridge, and checks scriptlet timing, hiding (including iframes and strict CSP), HLS and `$jsonprune` rewriting for fetch and XHR players, popups, the AdGuard IMA stand-in, and that every scriptlet and raw JS rule in the bundled lists resolves and parses. Chromium is not Android WebView; WebView-specific behavior still needs a device.
+
+After changing the bundled lists or the engine, rebuild the compiled filters with `./momiji-browser/gradlew -p tests/network-core compileProtection`, and the vendored AdGuard libraries with `tools/vendor-adguard.mjs`.
 
 The Android scenarios in the table above were run with a local emulator harness that is not part of this repository. The only Android-side check in the tree is the debug-build store check: `adb shell am start -n app.momiji.home/.HomeActivity --ez self_check true` writes `store-self-check.json` to the app's files directory.
 
@@ -42,6 +54,7 @@ TLS-record fragmentation remains in the core suite for protocol regression cover
 - Sleep/wake, launcher return, HDMI, service cards, notifications and gamepad handling.
 - Website-specific login/DRM/stream compatibility and behavior after network changes.
 - Full public-filter update memory/time on low-end TVs.
+- Shield cost per frame on old WebView builds (the document-start script is about 650 KB), popup confirmation on real remotes, and HLS pruning with real SSAI streams.
 - Provider-specific usefulness and overhead of TCP splitting, external proxies and DoH.
 
 When reporting a failure, include app version, device model, Android and WebView versions, the interaction sequence and the observed result. Remove personal URLs, cookies, tokens and viewing history from logs and screenshots.
