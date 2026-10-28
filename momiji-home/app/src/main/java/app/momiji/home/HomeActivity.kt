@@ -178,7 +178,7 @@ class HomeActivity : Activity() {
         setContentView(root)
         registerMotionObservers()
         io.submit { ownedAssets.pruneOrphans(); pruneOldExports() }
-        render(false)
+        // No render here: onResume always follows and refresh() renders straight away.
     }
 
     override fun onResume() {
@@ -223,25 +223,6 @@ class HomeActivity : Activity() {
             val result = StoreSelfCheck.run(this)
             File(filesDir, "store-self-check.json").writeText(result)
             android.util.Log.i("MomijiHomeCheck", result)
-        }
-        if (BuildConfig.DEBUG && request.getBooleanExtra("artwork_check",false)) io.submit {
-            val result=runCatching { Class.forName("app.momiji.home.ui.ArtworkCancellationSelfCheck")
-                .getMethod("run",Context::class.java).invoke(null,this)?.toString() ?: error("No check result") }
-                .getOrElse { org.json.JSONObject().put("ok",false).put("error",it.toString()).toString() }
-            File(filesDir,"artwork-self-check.json").writeText(result)
-        }
-        if (BuildConfig.DEBUG) for ((extra,helper,file) in listOf(
-            Triple("ambient_check","AmbientSelfCheck","ambient-self-check.json"),
-            Triple("activity_check","ActivitySelfCheck","activity-self-check.json"))) {
-            if (request.getBooleanExtra(extra,false)) main.postDelayed({
-                if (!active || isDestroyed) return@postDelayed
-                io.submit {
-                    val result=runCatching { Class.forName("app.momiji.home.ui.$helper")
-                        .getMethod("run",Activity::class.java).invoke(null,this)?.toString() ?: error("No check result") }
-                        .getOrElse { org.json.JSONObject().put("ok",false).put("error",it.toString()).toString() }
-                    File(filesDir,file).writeText(result)
-                }
-            },1000)
         }
     }
 
@@ -350,11 +331,14 @@ class HomeActivity : Activity() {
             main.post {
                 if (!isCurrent(generation, profileId)) return@post
                 val firstApps = apps.isEmpty()
+                // Every render rebuilds the whole screen, so skip it when the reload found
+                // nothing new; a pending focus/scroll restore still needs one.
+                val changed = loading || foundApps != apps || foundInputs != inputs
                 apps = foundApps
                 inputs = foundInputs
                 loading = false
-                seedFavorites(profileId)
-                render(!firstApps)
+                val seeded = seedFavorites(profileId)
+                if (changed || seeded || restoreFocusPending) render(!firstApps)
             }
         }
         feedJob = io.submit {
@@ -363,10 +347,11 @@ class HomeActivity : Activity() {
             val watched = runCatching { history.list(profileId, limit = 12) }.getOrDefault(emptyList())
             main.post {
                 if (!isCurrent(generation, profileId)) return@post
+                val changed = foundFeeds != feeds || watched != watchRecords
                 feeds = foundFeeds
                 watchRecords = watched
                 feedsLoading=false
-                render(true)
+                if (changed || restoreFocusPending) render(true)
             }
         }
     }
@@ -380,17 +365,23 @@ class HomeActivity : Activity() {
     private fun isCurrent(generation: Int, profileId: String): Boolean =
         active && !isDestroyed && generation == loadVersion && store.activeProfile().id == profileId
 
-    private fun seedFavorites(profileId: String) {
+    /** Returns true when it filled the profile's favorites. */
+    private fun seedFavorites(profileId: String): Boolean {
         val uiPrefs = getSharedPreferences("home_ui", MODE_PRIVATE)
         val seeded = uiPrefs.getStringSet("seeded_profiles", emptySet())!!.toMutableSet()
-        if (profileId in seeded || apps.isEmpty()) return
-        if (store.favorites(profileId).isEmpty()) {
-            val packages = listOf("com.google.android.youtube.tv", "ru.kinopoisk.tv", "com.adguard.vpn", "app.momiji.tv", "com.vk.tv")
+        if (profileId in seeded || apps.isEmpty()) return false
+        val empty = store.favorites(profileId).isEmpty()
+        if (empty) {
+            // Only the companion browser and the stock YouTube app are singled out; the rest are
+            // whatever TV apps this device has.
+            val packages = listOf("app.momiji.tv", "com.google.android.youtube.tv")
             val preferred = packages.mapNotNull { pkg -> apps.firstOrNull { it.packageName == pkg } }.map { it.key }
-            store.setFavorites(profileId, (preferred + apps.take(5).map { it.key }).distinct().take(6))
+            val tvApps = apps.filter { it.isTv }.ifEmpty { apps }
+            store.setFavorites(profileId, (preferred + tvApps.take(6).map { it.key }).distinct().take(6))
         }
         seeded.add(profileId)
         uiPrefs.edit().putStringSet("seeded_profiles", seeded).apply()
+        return empty
     }
 
     private fun render(preserveFocus: Boolean) {
