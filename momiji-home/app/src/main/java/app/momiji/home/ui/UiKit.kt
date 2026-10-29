@@ -39,6 +39,9 @@ class HomeBackdrop(context: Context) : View(context) {
     private var wallpaperRequested = false
     private var requestedWallpaper: String? = null
     private var loadingWallpaper = false
+    /** True when the wallpaper is an Ultra HDR photo (it carries a gain map), so the window may switch to HDR. */
+    var hdrWallpaper = false; private set
+    var onHdrChanged: ((Boolean) -> Unit)? = null
     init { importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_NO; setWillNotDraw(false); setWallpaper(null) }
 
     fun setWallpaper(uri: String?) {
@@ -55,6 +58,8 @@ class HomeBackdrop(context: Context) : View(context) {
                 loadingWallpaper = false
                 // Do not recycle the old bitmap: a hardware display list may still use it.
                 picture = bitmap
+                val hdr = android.os.Build.VERSION.SDK_INT >= 34 && bitmap?.hasGainmap() == true
+                if (hdr != hdrWallpaper) { hdrWallpaper = hdr; onHdrChanged?.invoke(hdr) }
                 crop()
                 invalidate()
             }

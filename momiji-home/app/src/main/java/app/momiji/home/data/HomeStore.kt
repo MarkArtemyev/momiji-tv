@@ -189,6 +189,12 @@ class HomeStore(context: Context, prefsName: String = "momiji_home") {
             prefs.edit().putString("wallpaper_uri", value).apply()
         }
 
+    /** One screen preset for the whole device: the panel is shared by every profile. */
+    var screenPreset: app.momiji.home.display.Preset
+        get() = runCatching { app.momiji.home.display.Preset.valueOf(prefs.getString("screen_preset", null).orEmpty()) }
+            .getOrDefault(app.momiji.home.display.Preset.SYSTEM)
+        set(value) { prefs.edit().putString("screen_preset", value.name).apply() }
+
     var animationsEnabled: Boolean
         get() = try { prefs.getBoolean("animations", true) } catch (_: ClassCastException) { true }
         set(value) { prefs.edit().putBoolean("animations", value).apply() }

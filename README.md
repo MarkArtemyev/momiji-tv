@@ -39,6 +39,7 @@ Both apps can run independently. Install the pair to share network settings and 
 - Choose card sizes, grid density, accent colors, fonts, corners and custom backgrounds.
 - Keep app cards clean with centered icons and optional labels. Content titles stay readable.
 - Turn on falling maple leaves, fireflies or stars, with per-profile speed, density and color controls.
+- Tune a Mini-LED TV with presets for a dark room, a bright room and games. Home reads the panel's modes, HDR formats and brightness. It sets refresh rate, wide colour and HDR for its own window. After a one-time ADB grant, it also sets the system's frame-rate matching, HDR formats and ALLM. Each preset comes with a checklist for the TV's picture menu.
 - Use a dedicated games view with gamepad detection and a shortcut to Bluetooth settings.
 - Import and export layout settings without exporting history or account data.
 

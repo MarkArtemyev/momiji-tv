@@ -30,6 +30,8 @@ jobs:
             **/gradle-wrapper.properties
       - name: Core integration checks
         run: ./momiji-browser/gradlew -p tests/network-core networkCheck --no-daemon --max-workers=1
+      - name: Home screen preset checks
+        run: ./momiji-browser/gradlew -p tests/home-display displayCheck --no-daemon --max-workers=1
       - name: Shield checks in Chromium
         working-directory: tests/web-shield
         run: |

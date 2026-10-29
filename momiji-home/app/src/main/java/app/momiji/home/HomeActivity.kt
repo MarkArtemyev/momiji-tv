@@ -56,6 +56,11 @@ import app.momiji.home.ui.CustomizeDialogs
 import app.momiji.home.ui.VisibleArtwork
 import app.momiji.home.ui.AmbientView
 import app.momiji.home.ui.AmbientEffect
+import app.momiji.home.display.DisplayProbe
+import app.momiji.home.display.Preset
+import app.momiji.home.display.ScreenFacts
+import app.momiji.home.display.ScreenPlan
+import app.momiji.home.display.ScreenTuner
 import java.io.File
 import java.io.InputStream
 import java.text.SimpleDateFormat
@@ -148,6 +153,7 @@ class HomeActivity : Activity() {
         runDebugCheck(intent)
         val root = FrameLayout(this)
         backdrop = HomeBackdrop(this)
+        backdrop.onHdrChanged = { if (active) applyScreen() }
         root.addView(backdrop, FrameLayout.LayoutParams(-1, -1))
         ambient=AmbientView(this)
         root.addView(ambient,FrameLayout.LayoutParams(-1,-1))
@@ -188,6 +194,7 @@ class HomeActivity : Activity() {
         artwork.resume()
         backdrop.setWallpaper(store.wallpaperUri)
         backdrop.setMode(store.performanceMode)
+        applyScreen()
         main.removeCallbacks(minuteTick)
         minuteTick.run()
         refresh()
@@ -268,7 +275,8 @@ class HomeActivity : Activity() {
         if (!::ambient.isInitialized) return
         val profile=store.activeProfile(); val layout=store.layout(profile.id)
         val permitted=store.animationsEnabled && store.performanceMode!=PerformanceMode.LITE &&
-            ValueAnimator.areAnimatorsEnabled() && !getSystemService(PowerManager::class.java).isPowerSaveMode
+            ValueAnimator.areAnimatorsEnabled() && !getSystemService(PowerManager::class.java).isPowerSaveMode &&
+            !ScreenPlan.tuning(store.screenPreset).calmAmbient
         val effect=if (permitted) runCatching { AmbientEffect.valueOf(layout.ambientEffect) }.getOrDefault(AmbientEffect.OFF) else AmbientEffect.OFF
         val colors=intArrayOf(profile.accent,Color.rgb(255,181,91),Color.rgb(114,225,171),Color.rgb(193,162,255),Color.rgb(153,215,255))
         ambient.configure(effect,layout.ambientIntensity,floatArrayOf(.6f,1f,1.4f)[layout.ambientSpeed],colors[layout.ambientColor])
@@ -806,7 +814,7 @@ class HomeActivity : Activity() {
 
     private fun showSettings() {
         val labels = arrayOf(
-            "Оформление профиля", "Мои категории", "Профили", "Перенос настроек",
+            "Экран и Mini-LED · ${store.screenPreset.title}", "Оформление профиля", "Мои категории", "Профили", "Перенос настроек",
             "Производительность · ${modeLabel(store.performanceMode)}",
             "Анимации · ${if (store.animationsEnabled) "включены" else "выключены"}",
             "Выбрать свои обои", "Вернуть фон Momiji", "Скрытые приложения",
@@ -814,30 +822,105 @@ class HomeActivity : Activity() {
         )
         AlertDialog.Builder(this).setTitle("Настроить свой экран").setItems(labels) { _, which ->
             when (which) {
-                0 -> customize.appearance()
-                1 -> customize.categories()
-                2 -> showProfiles()
-                3 -> showBackup()
-                4 -> showPerformance()
-                5 -> { store.animationsEnabled = !store.animationsEnabled; render(true) }
-                6 -> chooseWallpaper()
-                7 -> resetWallpaper()
-                8 -> showHiddenApps()
-                9 -> requestTvCards()
-                10 -> launchIntent(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
-                11 -> launchIntent(Intent(Settings.ACTION_SETTINGS))
-                12 -> { HomeKeyService.allowGoogleHome(); openPackage(HomeKeyService.GOOGLE_HOME) }
-                13 -> AlertDialog.Builder(this).setTitle("Momiji Home ${BuildConfig.VERSION_NAME}")
+                0 -> showScreen()
+                1 -> customize.appearance()
+                2 -> customize.categories()
+                3 -> showProfiles()
+                4 -> showBackup()
+                5 -> showPerformance()
+                6 -> { store.animationsEnabled = !store.animationsEnabled; render(true) }
+                7 -> chooseWallpaper()
+                8 -> resetWallpaper()
+                9 -> showHiddenApps()
+                10 -> requestTvCards()
+                11 -> launchIntent(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+                12 -> launchIntent(Intent(Settings.ACTION_SETTINGS))
+                13 -> { HomeKeyService.allowGoogleHome(); openPackage(HomeKeyService.GOOGLE_HOME) }
+                14 -> AlertDialog.Builder(this).setTitle("Momiji Home ${BuildConfig.VERSION_NAME}")
                     .setMessage("Твой главный экран: категории, оформление карточек, профили, избранное, раздельный просмотр в нативном плеере Momiji Browser 0.2.2+, доступные карточки сервисов и медиапульт.\n\nУдерживай OK на приложении для настройки. Поиск: кнопка Search или Ctrl+F. Меню: кнопка Menu. При запуске игры фоновые загрузки и оформление Momiji останавливаются.\n\nЛокальные профили Momiji не переключают аккаунты других сервисов.")
                     .setPositiveButton("Хорошо", null).show()
-                14 -> showDeviceInfo()
-                15 -> showAmbientSettings()
-                16 -> {
+                15 -> showDeviceInfo()
+                16 -> showAmbientSettings()
+                17 -> {
                     try { startActivity(Intent().setClassName("app.momiji.tv","app.momiji.tv.NetworkSettingsActivity")) }
                     catch(_: Exception) { toast("Нужна новая версия Momiji Browser с настройками сети") }
                 }
             }
         }.setNegativeButton("Закрыть", null).show()
+    }
+
+    private fun applyScreen() {
+        runCatching { ScreenTuner.applyWindow(this, store.screenPreset, DisplayProbe.facts(this), backdrop.hdrWallpaper) }
+    }
+
+    /** Presets, what the panel reports, the TV picture menu checklist and system-wide display settings. */
+    private fun showScreen() {
+        val facts = runCatching { DisplayProbe.facts(this) }.getOrNull() ?: run { toast("Система не отдала данные экрана"); return }
+        val preset = store.screenPreset
+        val pending = ScreenPlan.changes(preset, facts)
+        val system = when {
+            preset == Preset.SYSTEM -> "Настройки экрана для всех приложений · не меняются"
+            !facts.canWriteSettings -> "Настройки экрана для всех приложений · нужен доступ по ADB"
+            pending.isEmpty() -> "Настройки экрана для всех приложений · применены"
+            else -> "Настройки экрана для всех приложений · применить (${pending.size})"
+        }
+        AlertDialog.Builder(this).setTitle("Экран и Mini-LED").setItems(arrayOf("Пресет · ${preset.title}", "Что умеет этот экран",
+            "Как настроить картинку в меню ТВ", system, "Открыть настройки экрана Android")) { _, which ->
+            when (which) {
+                0 -> chooseScreenPreset(facts)
+                1 -> AlertDialog.Builder(this).setTitle("Что умеет экран").setMessage(ScreenPlan.report(facts)).setPositiveButton("Готово", null).show()
+                2 -> AlertDialog.Builder(this).setTitle(preset.title).setMessage(ScreenPlan.advice(preset, facts))
+                    .setPositiveButton("Открыть настройки") { _, _ -> openDisplaySettings() }.setNegativeButton("Закрыть", null).show()
+                3 -> if (facts.canWriteSettings) applySystemScreen(preset, facts) else if (preset != Preset.SYSTEM) showScreenAccess()
+                4 -> openDisplaySettings()
+            }
+        }.setNegativeButton("Закрыть", null).show()
+    }
+
+    private fun chooseScreenPreset(facts: ScreenFacts) {
+        val presets = Preset.entries
+        AlertDialog.Builder(this).setTitle("Пресет экрана").setSingleChoiceItems(presets.map { "${it.title}\n${it.subtitle}" }.toTypedArray(),
+            presets.indexOf(store.screenPreset)) { dialog, which ->
+            dialog.dismiss()
+            val preset = presets[which]
+            store.screenPreset = preset
+            applyScreen()
+            syncAmbient()
+            when {
+                facts.canWriteSettings -> applySystemScreen(preset, facts)
+                ScreenPlan.changes(preset, facts).isNotEmpty() -> showScreenAccess()
+                else -> toast("Пресет «${preset.title}» включён")
+            }
+        }.setNegativeButton("Отмена", null).show()
+    }
+
+    private fun applySystemScreen(preset: Preset, facts: ScreenFacts) {
+        io.submit {
+            val outcome = ScreenTuner.applySystem(this, preset, facts)
+            main.post {
+                if (isDestroyed) return@post
+                val text = buildString {
+                    append(if (preset == Preset.SYSTEM) "Вернул прежние настройки экрана." else "Пресет «${preset.title}» включён.")
+                    if (preset != Preset.SYSTEM && outcome.applied.isNotEmpty()) append("\n\n").append(outcome.applied.joinToString("\n") { "✓ $it" })
+                    if (outcome.failed.isNotEmpty()) append("\n\nНе получилось: ").append(outcome.failed.joinToString(", ")).append(". Эта прошивка не даёт их менять.")
+                    if (outcome.applied.isNotEmpty()) append("\n\nЕсли частота или HDR не переключились сразу, перезагрузи телевизор: некоторые прошивки читают эти настройки только при старте.")
+                }
+                AlertDialog.Builder(this).setTitle("Экран").setMessage(text).setPositiveButton("Готово", null).show()
+            }
+        }
+    }
+
+    private fun showScreenAccess() {
+        AlertDialog.Builder(this).setTitle("Экран для всех приложений")
+            .setMessage("Окно Momiji уже настроено. Чтобы подстройка частоты под видео, все HDR-форматы и игровой режим ALLM работали во всех приложениях " +
+                "(YouTube, онлайн-кинотеатры, плеер Momiji), разреши это один раз с компьютера, как при установке Momiji:\n\n${ScreenTuner.ADB_GRANT}\n\n" +
+                "Потом снова выбери пресет. Отозвать доступ:\n${ScreenTuner.ADB_REVOKE}")
+            .setPositiveButton("Понятно", null).show()
+    }
+
+    private fun openDisplaySettings() {
+        val display = Intent(Settings.ACTION_DISPLAY_SETTINGS)
+        launchIntent(if (display.resolveActivity(packageManager) != null) display else Intent(Settings.ACTION_SETTINGS))
     }
 
     private fun showAmbientSettings() {

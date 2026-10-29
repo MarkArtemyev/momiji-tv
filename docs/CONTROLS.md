@@ -8,6 +8,10 @@ In appearance settings, choose card size, columns, font, accent, corners and wal
 
 **Атмосферные эффекты** offers maple leaves, fireflies and stars. Color, density and speed are profile-specific. The effects are off by default and stop when the screen is hidden, when power-saving/reduced-motion rules apply, or when animations are disabled. Use economy mode to reduce focus animation on slower devices.
 
+**Экран и Mini-LED** (first item in Home settings) shows what the panel reports: modes, refresh rates reachable without blanking, HDR formats, peak and average brightness, wide colour and ALLM. It also offers presets: **Mini-LED · кино в темноте**, **Mini-LED · светлая комната**, **Mini-LED · игры** and **Как в системе**. A preset always sets Home's own window: wide colour, HDR for an Ultra HDR wallpaper on Android 14+, and the fastest refresh rate the panel reaches without blanking. The cinema preset also turns atmospheric effects off, because small bright particles on a dark background bloom on local-dimming panels. Each preset lists what to set in the TV's own picture menu (picture mode, local dimming, backlight, Dolby Vision, HGiG and HDMI 2.1). Android apps cannot change those settings.
+
+Three system-wide settings need a one-time grant from a computer: match content frame rate, automatic HDR formats and ALLM. Run `adb shell pm grant app.momiji.home android.permission.WRITE_SECURE_SETTINGS`, then pick the preset again. Momiji remembers each value it replaces, and **Как в системе** puts them back. Some firmware reads these settings only at startup, so restart the TV if nothing changes. To withdraw access, run `pm revoke` with the same arguments.
+
 Layouts export through Android's file picker as JSON. Import creates a profile rather than overwriting an existing one. History, website sessions, wallpapers and private artwork are not included in the layout export.
 
 ## Browser

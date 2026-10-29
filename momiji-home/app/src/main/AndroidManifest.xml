@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
     <permission android:name="app.momiji.permission.HOME_HISTORY" android:protectionLevel="signature" />
     <uses-feature android:name="android.software.leanback" android:required="false" />
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
@@ -7,6 +8,8 @@
     <uses-permission android:name="app.momiji.permission.NETWORK_SETTINGS" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.READ_TV_LISTINGS" />
+    <!-- Never granted at install: the owner may grant it once over ADB so screen presets reach every app. -->
+    <uses-permission android:name="android.permission.WRITE_SECURE_SETTINGS" tools:ignore="ProtectedPermissions" />
     <uses-permission android:name="com.android.providers.tv.permission.READ_EPG_DATA" />
     <queries>
         <provider android:authorities="app.momiji.tv.network" />

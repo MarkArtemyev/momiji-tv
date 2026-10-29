@@ -31,6 +31,22 @@ Android checks used an API 35 x86_64 emulator at 1280×720. It used a phone syst
 
 The 36-check suite starts local loopback fixtures and generates a short-lived PKCS12 certificate under its ignored build directory. It does not connect to a TV or use a production key. The pure-JVM suite covers filtering (list directives and platform hints, `$popup`, `$redirect`, page exceptions, `$replace`/`$hls`/`$jsonprune`), cosmetic and scriptlet compilation, HLS ad pruning, the browser's merge of page, custom and DNS-table decisions, and transport. It also compiles the bundled lists with the new engine and checks the heap they need (about 25 MiB on the JVM). It does not substitute for Android WebView/media checks or test public resolver reachability.
 
+## Run the Home screen preset checks
+
+```sh
+./momiji-browser/gradlew -p tests/home-display displayCheck --max-workers=1
+```
+
+These pure-JVM checks run Home's screen logic against a reported 4K Mini-LED panel. They cover:
+
+- what each preset sets;
+- that the refresh rate rises only seamlessly and at the same resolution;
+- which system settings are skipped because they already match or this Android version lacks them;
+- the panel report, including 23.976 Hz;
+- the picture-menu advice.
+
+They do not touch a display. Whether a vendor's firmware honours each setting still needs a real TV.
+
 ## Run the shield suite in Chromium
 
 ```sh
@@ -54,6 +70,7 @@ TLS-record fragmentation remains in the core suite for protocol regression cover
 - Sleep/wake, launcher return, HDMI, service cards, notifications and gamepad handling.
 - Website-specific login/DRM/stream compatibility and behavior after network changes.
 - Full public-filter update memory/time on low-end TVs.
+- Screen presets on Mini-LED TVs from different vendors: seamless refresh switching, HDR window mode with an Ultra HDR wallpaper, and whether the firmware honours the granted system settings without a restart.
 - Shield cost per frame on old WebView builds (the document-start script is about 650 KB), popup confirmation on real remotes, and HLS pruning with real SSAI streams.
 - Provider-specific usefulness and overhead of TCP splitting, external proxies and DoH.
 

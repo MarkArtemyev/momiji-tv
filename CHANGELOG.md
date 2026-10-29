@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Home: screen and Mini-LED
+
+- **Экран и Mini-LED** reports the panel's modes, seamless refresh rates, HDR formats, brightness in nits, wide colour and ALLM. 23.976 Hz is listed separately from 24 Hz.
+- Presets for a dark room, a bright room and games:
+  - Home's window gets wide colour, HDR for Ultra HDR wallpapers and the fastest seamless refresh rate.
+  - The cinema preset switches off particle effects, which cause blooming on local dimming.
+- After a one-time ADB grant, presets also set the system's match content frame rate, automatic HDR formats and ALLM. The original values are remembered and restored by **Как в системе**.
+- Each preset includes a checklist for the TV's own picture menu, covering local dimming, backlight and picture mode, which apps cannot change.
+
 ### Ad blocking engine
 
 - Lists are read as the AdGuard Chromium extension reads them: `!#if` blocks and `!+ PLATFORM` hints are applied, so Safari/iOS workarounds no longer leak in. AdGuard Mobile Ads is added; ad lists load before the tracking list.
