@@ -23,6 +23,7 @@ Layouts export through Android's file picker as JSON. Import creates a profile r
 - Play/pause and seeking keys control supported web video or the native player.
 - When a direct supported stream is discovered, **Видеоплеер** opens the Media3 player.
 - In the native player, Menu opens available quality options, restart and statistics; Info opens statistics.
+- When Android's **Match content frame rate** is set to **Always** (the cinema preset in Home sets it), the native player switches the screen to the video's own rate, such as 23.976, 24, 25 or 50 Hz. If the stream does not declare its rate, the player measures it over the first frames. Playback pauses for 1.5 s while the screen changes mode. If the screen already shows a multiple of the new rate, for example 50 Hz for 25 fps, a quality change keeps the current mode. With other settings, the player only asks for seamless switches, as before. Statistics show the screen's refresh rate and the rate the player asked for.
 
 Native playback history belongs to the profile captured when playback starts. Switching Home profiles does not transfer an active playback checkpoint to the new profile. Resuming from Home opens the source page; start the native player again when it becomes available.
 

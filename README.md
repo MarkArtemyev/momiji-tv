@@ -49,6 +49,7 @@ Home uses Android Views and Canvas. Artwork loading is limited to visible cards,
 
 - Switch between element focus and a free cursor for websites that need mouse-style navigation.
 - Open direct supported video streams in a native Media3 player with seeking, subtitles, quality selection and playback statistics.
+- With Android's frame-rate matching set to Always, the native player switches the screen to the film's own rate (24, 23.976, 25, 50 Hz…). It measures the rate when the stream does not declare it and pauses while the screen changes mode.
 - Continue native playback through a profile-scoped Home history.
 - Pair a computer browser over the local network for mouse, keyboard, text and playback controls.
 - Keep the normal HttpEngine path for native playback when custom routing is off, using HTTP/2 or HTTP/3 when supported by the device and server.

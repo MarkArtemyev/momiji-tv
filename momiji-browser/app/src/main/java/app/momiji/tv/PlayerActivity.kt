@@ -3,6 +3,7 @@ package app.momiji.tv
 import android.app.Activity
 import android.app.AlertDialog
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.os.SystemClock
 import android.graphics.Color
@@ -39,6 +40,7 @@ class PlayerActivity : Activity(), RemoteControl.Target {
     private lateinit var root: FrameLayout
     private lateinit var cursor: CursorView
     private lateinit var menu: TextView
+    private lateinit var frameRate: FrameRateMatcher
     private var progressStore: PlaybackStore? = null
     private lateinit var homeHistory: HomeHistoryClient
     private var historySession: HomeHistoryClient.Session? = null
@@ -106,6 +108,7 @@ class PlayerActivity : Activity(), RemoteControl.Target {
             setShowPreviousButton(false)
             controllerShowTimeoutMs = 4000
         }
+        frameRate = FrameRateMatcher(this, view)
         root = FrameLayout(this)
         cursor = CursorView(this, null)
         root.addView(view, FrameLayout.LayoutParams(-1, -1))
@@ -173,10 +176,11 @@ class PlayerActivity : Activity(), RemoteControl.Target {
             .setBufferDurationsMs(15_000, 50_000, 1_000, 2_500)
             .setTargetBufferBytes(32 * 1024 * 1024)
             .setBackBuffer(5_000, true).build()
-        player = ExoPlayer.Builder(this, DefaultRenderersFactory(this).setEnableDecoderFallback(true))
+        player = frameRate.configure(ExoPlayer.Builder(this, DefaultRenderersFactory(this).setEnableDecoderFallback(true)))
             .setMediaSourceFactory(DefaultMediaSourceFactory(DefaultDataSource.Factory(this, http)))
             .setLoadControl(load).setSeekBackIncrementMs(10_000).setSeekForwardIncrementMs(10_000).build().also { p ->
                 view.player = p
+                frameRate.attach(p)
                 p.setAudioAttributes(AudioAttributes.DEFAULT, true)
                 p.setHandleAudioBecomingNoisy(true)
                 p.addAnalyticsListener(stats)
@@ -222,7 +226,8 @@ class PlayerActivity : Activity(), RemoteControl.Target {
                 .put("firstFrameMs",firstFrameMs).put("profileCaptured",historySession != null)
                 .put("profile",capturedProfile).put("scope",playbackScope).toString())
         }
-        player?.let { resumePlayback = it.playWhenReady; if (!seekOnReady) position = it.currentPosition; it.pause() }
+        // A pause held for a display mode change is not the viewer's pause.
+        player?.let { val held = frameRate.cancelHold(); resumePlayback = it.playWhenReady || held; if (!seekOnReady) position = it.currentPosition; it.pause() }
         super.onPause()
     }
 
@@ -243,6 +248,7 @@ class PlayerActivity : Activity(), RemoteControl.Target {
             view.keepScreenOn = false
             view.player = null
         }
+        if (::frameRate.isInitialized) frameRate.detach()
         player?.release()
         player = null
         super.onStop()
@@ -270,6 +276,7 @@ class PlayerActivity : Activity(), RemoteControl.Target {
             return true
         }
         if (navigationKey(event.keyCode)) { pointerActive = false; cursor.hideNow() }
+        if (event.keyCode == KeyEvent.KEYCODE_MEDIA_PAUSE || event.keyCode == KeyEvent.KEYCODE_MEDIA_STOP) frameRate.cancelHold()
         return super.dispatchKeyEvent(event)
     }
 
@@ -385,7 +392,7 @@ class PlayerActivity : Activity(), RemoteControl.Target {
 
     private fun formatLabel(format: Format): String {
         val size = if (format.height > 0) "${format.height}p" else format.sampleMimeType?.substringAfter('/') ?: getString(R.string.video_unknown)
-        val fps = if (format.frameRate > 0) " · ${format.frameRate.toInt()} fps" else ""
+        val fps = if (format.frameRate > 0) " · ${FrameRatePlan.number(format.frameRate)} fps" else ""
         val rate = if (format.bitrate > 0) " · ${getString(R.string.video_mbps, format.bitrate / 1_000_000.0)}" else ""
         return size + fps + rate
     }
@@ -419,11 +426,19 @@ class PlayerActivity : Activity(), RemoteControl.Target {
         val p = player ?: return
         val snapshot = stats.combinedPlaybackStats
         fun seconds(ms: Long) = if (ms >= 0) getString(R.string.video_seconds, ms / 1000.0) else getString(R.string.video_unknown)
+        @Suppress("DEPRECATION")
+        val refresh = (if (Build.VERSION.SDK_INT >= 30) display else windowManager.defaultDisplay)?.refreshRate
+        val screen = when {
+            refresh == null -> getString(R.string.video_unknown)
+            !frameRate.active -> getString(R.string.video_screen, FrameRatePlan.number(refresh))
+            else -> frameRate.requested?.let { getString(R.string.video_screen_matched, FrameRatePlan.number(refresh), FrameRatePlan.number(it)) }
+                ?: getString(R.string.video_screen_measuring, FrameRatePlan.number(refresh))
+        }
         val detail = getString(R.string.video_stats_values,
             seconds(firstFrameMs), p.videoFormat?.let(::formatLabel) ?: getString(R.string.video_unknown),
             seconds((p.bufferedPosition - p.currentPosition).coerceAtLeast(0L)), snapshot.totalRebufferCount,
             seconds(snapshot.totalRebufferTimeMs), snapshot.totalDroppedFrames,
-            if (bandwidthEstimate > 0) getString(R.string.video_mbps, bandwidthEstimate / 1_000_000.0) else getString(R.string.video_unknown))
+            if (bandwidthEstimate > 0) getString(R.string.video_mbps, bandwidthEstimate / 1_000_000.0) else getString(R.string.video_unknown), screen)
         showDialog(AlertDialog.Builder(this).setTitle(R.string.video_stats).setMessage(detail)
             .setPositiveButton(android.R.string.ok, null).create())
     }

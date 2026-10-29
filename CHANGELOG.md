@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-### Home: screen and Mini-LED
+### Screen and Mini-LED
 
 - **Экран и Mini-LED** reports the panel's modes, seamless refresh rates, HDR formats, brightness in nits, wide colour and ALLM. 23.976 Hz is listed separately from 24 Hz.
 - Presets for a dark room, a bright room and games:
@@ -10,6 +10,7 @@
   - The cinema preset switches off particle effects, which cause blooming on local dimming.
 - After a one-time ADB grant, presets also set the system's match content frame rate, automatic HDR formats and ALLM. The original values are remembered and restored by **Как в системе**.
 - Each preset includes a checklist for the TV's own picture menu, covering local dimming, backlight and picture mode, which apps cannot change.
+- With **Always** frame-rate matching, the native Browser player puts the screen on the video's rate (23.976/24/25/29.97/50/59.94 Hz and more). Rates are measured when a stream does not declare them. Playback waits 1.5 s for the mode change, and an adaptive quality change does not blank the screen again. Statistics show the screen's rate and the rate requested; 23.976 fps is no longer shown as 23.
 
 ### Ad blocking engine
 

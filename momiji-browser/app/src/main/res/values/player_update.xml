@@ -7,7 +7,10 @@
     <string name="video_quality_loading">Дорожки ещё загружаются. Попробуй после начала видео.</string>
     <string name="video_restart">Смотреть сначала</string>
     <string name="video_stats">Статистика воспроизведения</string>
-    <string name="video_stats_values">Первый кадр: %1$s\nВидео: %2$s\nБуфер вперёд: %3$s\nОстановок для загрузки: %4$d\nВремя этих остановок: %5$s\nПропущено кадров: %6$d\nОценка скорости загрузки: %7$s\n\nСтатистика текущего открытия плеера. Это не тест скорости интернет-тарифа.</string>
+    <string name="video_stats_values">Первый кадр: %1$s\nВидео: %2$s\nЭкран: %8$s\nБуфер вперёд: %3$s\nОстановок для загрузки: %4$d\nВремя этих остановок: %5$s\nПропущено кадров: %6$d\nОценка скорости загрузки: %7$s\n\nСтатистика текущего открытия плеера. Это не тест скорости интернет-тарифа.</string>
+    <string name="video_screen">%1$s Гц</string>
+    <string name="video_screen_matched">%1$s Гц, подстроен под видео %2$s fps</string>
+    <string name="video_screen_measuring">%1$s Гц, частота видео ещё измеряется</string>
     <string name="video_seconds">%1$.1f с</string>
     <string name="video_mbps">%1$.1f Мбит/с</string>
     <string name="video_unknown">—</string>

@@ -31,10 +31,10 @@ Android checks used an API 35 x86_64 emulator at 1280×720. It used a phone syst
 
 The 36-check suite starts local loopback fixtures and generates a short-lived PKCS12 certificate under its ignored build directory. It does not connect to a TV or use a production key. The pure-JVM suite covers filtering (list directives and platform hints, `$popup`, `$redirect`, page exceptions, `$replace`/`$hls`/`$jsonprune`), cosmetic and scriptlet compilation, HLS ad pruning, the browser's merge of page, custom and DNS-table decisions, and transport. It also compiles the bundled lists with the new engine and checks the heap they need (about 25 MiB on the JVM). It does not substitute for Android WebView/media checks or test public resolver reachability.
 
-## Run the Home screen preset checks
+## Run the screen and frame-rate checks
 
 ```sh
-./momiji-browser/gradlew -p tests/home-display displayCheck --max-workers=1
+./momiji-browser/gradlew -p tests/display displayCheck --max-workers=1
 ```
 
 These pure-JVM checks run Home's screen logic against a reported 4K Mini-LED panel. They cover:
@@ -44,6 +44,12 @@ These pure-JVM checks run Home's screen logic against a reported 4K Mini-LED pan
 - which system settings are skipped because they already match or this Android version lacks them;
 - the panel report, including 23.976 Hz;
 - the picture-menu advice.
+
+They also check the native player's frame-rate choice:
+
+- rates snap to film and broadcast rates, with 23.976 kept apart from 24;
+- an adaptive quality switch keeps a display rate that already fits;
+- the rate is measured from microsecond and 90 kHz MPEG-TS timestamps, ignoring dropped frames and seeks, and variable-rate video is left alone.
 
 They do not touch a display. Whether a vendor's firmware honours each setting still needs a real TV.
 
@@ -71,6 +77,7 @@ TLS-record fragmentation remains in the core suite for protocol regression cover
 - Website-specific login/DRM/stream compatibility and behavior after network changes.
 - Full public-filter update memory/time on low-end TVs.
 - Screen presets on Mini-LED TVs from different vendors: seamless refresh switching, HDR window mode with an Ultra HDR wallpaper, and whether the firmware honours the granted system settings without a restart.
+- Native player frame-rate switching with "Always": blank time per vendor, whether the 1.5 s pause covers it, and HDMI receivers in between.
 - Shield cost per frame on old WebView builds (the document-start script is about 650 KB), popup confirmation on real remotes, and HLS pruning with real SSAI streams.
 - Provider-specific usefulness and overhead of TCP splitting, external proxies and DoH.
 

@@ -1,6 +1,8 @@
 import app.momiji.home.display.*
+import app.momiji.tv.FrameRateEstimator
+import app.momiji.tv.FrameRatePlan
 
-/** Screen preset checks for Momiji Home: run with `./momiji-browser/gradlew -p tests/home-display displayCheck`. */
+/** Home screen presets and the native player's frame rate: run with `./momiji-browser/gradlew -p tests/display displayCheck`. */
 fun main() {
     var passed = 0
     fun test(name: String, action: () -> Unit) { action(); passed++; println("PASS $name") }
@@ -67,5 +69,41 @@ fun main() {
         check("прошивка производителя" in cinema && "прошивка" !in ScreenPlan.advice(Preset.SYSTEM, miniLed))
     }
 
-    println("HOME_DISPLAY_PASSED=$passed")
+    test("frame_rates_snap_to_film_and_broadcast_rates") {
+        check(FrameRatePlan.snap(23.976025f) == 23.976f && FrameRatePlan.snap(23.98f) == 23.976f && FrameRatePlan.snap(24.0001f) == 24f)
+        check(FrameRatePlan.snap(25f) == 25f && FrameRatePlan.snap(29.97f) == 29.97f && FrameRatePlan.snap(59.94f) == 59.94f && FrameRatePlan.snap(50.2f) == 50f)
+        for (odd in listOf(12.5f, 37f, 0f, -1f, Float.NaN)) check(FrameRatePlan.snap(odd) == null) { "$odd" }
+        check(FrameRatePlan.number(23.976f) == "23,976" && FrameRatePlan.number(24f) == "24" && FrameRatePlan.number(59.94f) == "59,94" && FrameRatePlan.number(60.0001f) == "60")
+    }
+
+    test("an_adaptive_switch_keeps_a_rate_that_already_fits") {
+        check(FrameRatePlan.next(null, 25f) == 25f)
+        check(FrameRatePlan.next(50f, 25f) == 50f && FrameRatePlan.next(59.94f, 29.97f) == 59.94f && FrameRatePlan.next(47.952f, 23.976f) == 47.952f)
+        check(FrameRatePlan.next(120f, 24f) == 120f)
+        // 24 is not a multiple of 23.976: a film on it stutters once every 42 seconds.
+        check(FrameRatePlan.next(24f, 23.976f) == 23.976f && FrameRatePlan.next(23.976f, 24f) == 24f)
+        check(FrameRatePlan.next(60f, 24f) == 24f && FrameRatePlan.next(25f, 50f) == 50f)
+    }
+
+    test("frame_rate_is_measured_when_the_stream_does_not_declare_it") {
+        fun measure(times: List<Long>): Float? { val e = FrameRateEstimator(); var result: Float? = null; for (t in times) result = e.add(t) ?: result; return result }
+        fun micros(frames: Int, frameUs: Double) = (0 until frames).map { Math.round(it * frameUs) }
+        // 90 kHz MPEG-TS clock: 23.976 fps is 3753.75 ticks a frame, so steps alternate between two values.
+        fun ticks(frames: Int, perFrame: Double) = (0 until frames).map { Math.round(Math.floor(it * perFrame) * 1_000_000.0 / 90_000) }
+        check(measure(micros(61, 1_000_000.0 * 1001 / 24000)) == 23.976f)
+        check(measure(micros(61, 1_000_000.0 / 24)) == 24f)
+        check(measure(ticks(61, 3753.75)) == 23.976f && measure(ticks(61, 3600.0)) == 25f && measure(ticks(61, 3003.0)) == 29.97f)
+        check(measure(micros(60, 40_000.0)) == null) { "60 frames are only 59 steps" }
+        // Every tenth frame dropped by a slow decoder: the double steps are left out.
+        check(measure(micros(80, 40_000.0).filterIndexed { i, _ -> i % 10 != 5 }) == 25f)
+        // A seek restarts the count.
+        val seek = micros(40, 40_000.0) + micros(40, 40_000.0).map { it + 10_000_000 }
+        check(measure(seek) == null)
+        check(measure(seek + micros(30, 40_000.0).map { it + 11_600_000 }) == 25f)
+        // Variable frame rate from a phone camera is left alone.
+        val random = java.util.Random(7); var t = 0L
+        check(measure((0 until 120).map { t += 20_000 + random.nextInt(40_000); t }) == null)
+    }
+
+    println("DISPLAY_PASSED=$passed")
 }
